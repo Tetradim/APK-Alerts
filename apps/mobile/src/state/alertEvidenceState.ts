@@ -351,12 +351,19 @@ export function buildQueuePlaceEvidenceSummary(chain: AlertEvidenceChain | null 
   }
 
   const audited = Boolean(chain?.decision);
-  const queued = audited && ingestion.alertInserted && ingestion.tradeRequested;
+  const hasInsertedAlertId = Boolean(ingestion.alertId);
+  const queued = audited && ingestion.alertInserted && hasInsertedAlertId && ingestion.tradeRequested;
   return {
     statusLabel: formatQueuePlaceStatusLabel(ingestion.status, ingestion.alertInserted, ingestion.tradeRequested),
-    gateLabel: queued ? "Queue proof clear" : "No order queued",
+    gateLabel: queued
+      ? "Queue proof clear"
+      : ingestion.tradeRequested
+        ? "Queue proof blocked"
+        : "No order queued",
     alertInsertLabel: ingestion.alertInserted
-      ? `Alert inserted: ${ingestion.alertId || "id missing"}`
+      ? hasInsertedAlertId
+        ? `Alert inserted: ${ingestion.alertId}`
+        : "Alert insert id missing"
       : "Alert not inserted",
     queueLabel: ingestion.tradeRequested ? "Trade request queued" : "Trade request not queued",
     reasonLabel: firstNonEmptyText(ingestion.tradeRequestReason, ingestion.skipReason, "No execution reason returned"),

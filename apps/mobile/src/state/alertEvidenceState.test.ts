@@ -482,6 +482,54 @@ test("queue place summary exposes audited inserted alert and queued trade reques
   assert.equal(summary.blocking, false);
 });
 
+test("queue place summary blocks queued trade when inserted alert id is missing", () => {
+  const missingAlertIdDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-queued-missing-alert-id",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "warning",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-missing-alert-id",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
+        channel_url_allowed: true,
+        allowed_author_id_count: 1,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [], decisions: [missingAlertIdDecision] })[0];
+  const summary = buildQueuePlaceEvidenceSummary(chain);
+
+  assert.equal(summary.statusLabel, "Order request queued");
+  assert.equal(summary.gateLabel, "Queue proof blocked");
+  assert.equal(summary.alertInsertLabel, "Alert insert id missing");
+  assert.equal(summary.queueLabel, "Trade request queued");
+  assert.equal(summary.reasonLabel, "risk approved; order intent queued");
+  assert.equal(summary.auditLabel, "Audited decision: audit-queued-missing-alert-id");
+  assert.equal(summary.blocking, true);
+});
+
 test("queue place summary exposes audited alert insertion without queued execution", () => {
   const chain = evidenceSnapshot().chains[0];
   const summary = buildQueuePlaceEvidenceSummary(chain);
