@@ -4,7 +4,11 @@ import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import { buildExitProtectionEvidenceSummary, useLiveReadinessState } from "@/state/liveReadinessState";
-import { buildReconciliationSummary, useReconciliationState } from "@/state/reconciliationState";
+import {
+  buildOrderLifecycleEvidenceSummary,
+  buildReconciliationSummary,
+  useReconciliationState,
+} from "@/state/reconciliationState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
 
 function statusTone(label: string): "good" | "warn" | "bad" | "neutral" {
@@ -15,6 +19,10 @@ function statusTone(label: string): "good" | "warn" | "bad" | "neutral" {
     return "warn";
   }
   return "neutral";
+}
+
+function lifecycleTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
 }
 
 export function PositionsScreen() {
@@ -131,22 +139,49 @@ export function PositionsScreen() {
           </Text>
         </View>
       ) : (
-        reconciliationSnapshot.remote.rows.slice(0, 12).map((row) => (
-          <View key={`${row.alertId}-${row.tradeId}-${row.positionId}`} style={styles.panel}>
-            <View style={styles.panelHeader}>
-              <View style={styles.headerCopy}>
-                <Text style={styles.label}>{row.contractKey || row.ticker || "Unknown contract"}</Text>
-                <Text style={styles.panelTitle}>{row.alertId || "Unknown alert"}</Text>
+        reconciliationSnapshot.remote.rows.slice(0, 12).map((row) => {
+          const lifecycle = buildOrderLifecycleEvidenceSummary(row);
+          return (
+            <View key={`${row.alertId}-${row.tradeId}-${row.positionId}`} style={styles.panel}>
+              <View style={styles.panelHeader}>
+                <View style={styles.headerCopy}>
+                  <Text style={styles.label}>{row.contractKey || row.ticker || "Unknown contract"}</Text>
+                  <Text style={styles.panelTitle}>{row.alertId || "Unknown alert"}</Text>
+                </View>
+                <StatusPill label={row.status} tone={row.status === "reconciled" ? "good" : "warn"} />
               </View>
-              <StatusPill label={row.status} tone={row.status === "reconciled" ? "good" : "warn"} />
+              <Text style={styles.detail}>Trade: {row.tradeId || "none"} - {row.tradeStatus || "unknown"}</Text>
+              <Text style={styles.detail}>Order: {row.orderId || "none"}</Text>
+              <Text style={styles.detail}>Position: {row.positionId || "none"} - {row.positionStatus || "unknown"}</Text>
+              <Text style={styles.detail}>Mode: {row.simulated ? "paper/simulated" : "real"}</Text>
+              <View style={styles.lifecyclePanel}>
+                <View style={styles.panelHeader}>
+                  <View style={styles.headerCopy}>
+                    <Text style={styles.label}>Order lifecycle evidence</Text>
+                    <Text style={styles.detail}>{lifecycle.readyCountLabel}</Text>
+                  </View>
+                  <StatusPill label={lifecycle.gateLabel} tone={lifecycleTone(lifecycle.blocking)} />
+                </View>
+                <Text style={styles.detail}>{lifecycle.blockingCountLabel}</Text>
+                {lifecycle.items.map((item) => (
+                  <View key={item.key} style={styles.lifecycleRow}>
+                    <Text style={styles.label}>{item.label}</Text>
+                    <Text
+                      style={[
+                        styles.lifecycleStatus,
+                        item.blocking ? styles.lifecycleBlocked : styles.lifecycleClear,
+                      ]}
+                    >
+                      {item.statusLabel}
+                    </Text>
+                    <Text style={styles.detail}>{item.detailLabel}</Text>
+                  </View>
+                ))}
+              </View>
+              {row.attentionReason ? <Text style={styles.error}>{row.attentionReason}</Text> : null}
             </View>
-            <Text style={styles.detail}>Trade: {row.tradeId || "none"} - {row.tradeStatus || "unknown"}</Text>
-            <Text style={styles.detail}>Order: {row.orderId || "none"}</Text>
-            <Text style={styles.detail}>Position: {row.positionId || "none"} - {row.positionStatus || "unknown"}</Text>
-            <Text style={styles.detail}>Mode: {row.simulated ? "paper/simulated" : "real"}</Text>
-            {row.attentionReason ? <Text style={styles.error}>{row.attentionReason}</Text> : null}
-          </View>
-        ))
+          );
+        })
       )}
     </ScreenFrame>
   );
@@ -166,6 +201,21 @@ const styles = StyleSheet.create({
   detail: { color: "#cbd5e1", fontSize: 13, lineHeight: 19 },
   footerDetail: { flex: 1 },
   error: { color: "#fca5a5", fontSize: 13, fontWeight: "800" },
+  lifecyclePanel: {
+    borderTopColor: "#334155",
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 10,
+  },
+  lifecycleRow: {
+    borderTopColor: "#1e293b",
+    borderTopWidth: 1,
+    gap: 4,
+    paddingTop: 8,
+  },
+  lifecycleStatus: { fontSize: 14, fontWeight: "900", lineHeight: 19 },
+  lifecycleBlocked: { color: "#fca5a5" },
+  lifecycleClear: { color: "#86efac" },
   button: {
     alignItems: "center",
     backgroundColor: "#2563eb",
