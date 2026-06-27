@@ -3,10 +3,13 @@ import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import { buildCockpitSummary, useOperatorState } from "@/state/operatorState";
+import { buildSettingsSummary, useSettingsState } from "@/state/settingsState";
 
 export function CockpitScreen() {
   const snapshot = useOperatorState((state) => state.snapshot);
-  const summary = buildCockpitSummary(snapshot);
+  const failoverSettings = useSettingsState((state) => state.snapshot.failoverSettings);
+  const settingsSummary = buildSettingsSummary(failoverSettings);
+  const summary = buildCockpitSummary(snapshot, settingsSummary);
 
   return (
     <ScreenFrame title="Operator Cockpit" eyebrow="APK-Alerts">
@@ -50,6 +53,12 @@ export function CockpitScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.policyPanel}>
+        <Text style={styles.policyLabel}>Configured policy</Text>
+        <Text style={styles.policyValue}>{summary.policyLabel}</Text>
+        <Text style={styles.policyDetail}>{summary.transportPolicyLabel}</Text>
+      </View>
+
       <View style={styles.emptyEvidence}>
         <Text style={styles.emptyTitle}>No live event log paired</Text>
         <Text style={styles.emptyCopy}>
@@ -77,6 +86,10 @@ const styles = StyleSheet.create({
   secondaryButton: { backgroundColor: "#334155" },
   disabledButton: { opacity: 0.48 },
   actionText: { color: "#ffffff", fontSize: 14, fontWeight: "900", textAlign: "center" },
+  policyPanel: { backgroundColor: "#111827", borderColor: "#334155", borderRadius: 8, borderWidth: 1, padding: 14 },
+  policyLabel: { color: "#94a3b8", fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
+  policyValue: { color: "#f8fafc", fontSize: 16, fontWeight: "900", marginTop: 5 },
+  policyDetail: { color: "#94a3b8", fontSize: 13, marginTop: 5 },
   emptyEvidence: { backgroundColor: "#111827", borderColor: "#334155", borderRadius: 8, borderWidth: 1, padding: 14 },
   emptyTitle: { color: "#f8fafc", fontSize: 16, fontWeight: "900" },
   emptyCopy: { color: "#94a3b8", fontSize: 13, marginTop: 6 },

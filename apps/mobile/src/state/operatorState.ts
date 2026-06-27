@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { SettingsSummary } from "./settingsState.js";
 
 export type ActiveEngine = "phone" | "remote" | "none";
 export type EngineHealth = "healthy" | "degraded" | "offline" | "unknown";
@@ -26,6 +27,8 @@ export interface CockpitSummary {
   transportLabel: string;
   syncLabel: string;
   primaryActionLabel: string;
+  policyLabel: string;
+  transportPolicyLabel: string;
   canExecute: boolean;
 }
 
@@ -40,7 +43,10 @@ export const NOT_PAIRED_OPERATOR_SNAPSHOT: OperatorSnapshot = {
   lastSyncLabel: "never",
 };
 
-export function buildCockpitSummary(snapshot: OperatorSnapshot): CockpitSummary {
+export function buildCockpitSummary(
+  snapshot: OperatorSnapshot,
+  settingsSummary?: SettingsSummary,
+): CockpitSummary {
   const activeEngineLabel =
     snapshot.activeEngine === "phone"
       ? "Phone Engine"
@@ -98,6 +104,8 @@ export function buildCockpitSummary(snapshot: OperatorSnapshot): CockpitSummary 
     transportLabel,
     syncLabel: snapshot.syncStatus === "synced" ? `Synced ${snapshot.lastSyncLabel}` : "Sync unavailable",
     primaryActionLabel: snapshot.activeEngine === "none" ? "Pair Remote Engine" : "View Engine Health",
+    policyLabel: settingsSummary?.engineLabel ?? "No failover policy",
+    transportPolicyLabel: settingsSummary?.transportLabel ?? "No transport policy",
     canExecute,
   };
 }

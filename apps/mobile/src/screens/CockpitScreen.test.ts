@@ -36,6 +36,17 @@ test("phone-owned healthy cockpit summary shows remote dormant", () => {
   assert.equal(summary.canExecute, true);
 });
 
+test("cockpit summary can include configured failover policy", () => {
+  const summary = buildCockpitSummary(EXECUTABLE_PHONE_SNAPSHOT, {
+    engineLabel: "Phone then Remote",
+    transportLabel: "Tailscale with cloud fallback",
+    notificationsLabel: "Failover and offline alerts on",
+  });
+
+  assert.equal(summary.policyLabel, "Phone then Remote");
+  assert.equal(summary.transportPolicyLabel, "Tailscale with cloud fallback");
+});
+
 test("active engine mismatch fails closed even with held lease readiness and sync", () => {
   const summary = buildCockpitSummary({
     ...EXECUTABLE_PHONE_SNAPSHOT,
