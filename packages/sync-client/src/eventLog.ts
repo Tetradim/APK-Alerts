@@ -1,5 +1,28 @@
 import type { AnyTradingEvent } from "@apk-alerts/contracts";
 
+function deepClone<T>(value: T): T {
+  return structuredClone(value);
+}
+
+function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  const objectValue = value as object;
+  if (seen.has(objectValue)) {
+    return value;
+  }
+
+  seen.add(objectValue);
+
+  for (const nestedValue of Object.values(objectValue as Record<string, unknown>)) {
+    deepFreeze(nestedValue, seen);
+  }
+
+  return Object.freeze(objectValue) as T;
+}
+
 export class DuplicateEventError extends Error {
   constructor(message: string) {
     super(message);
@@ -28,11 +51,13 @@ export class InMemoryEventLog {
       throw new DuplicateEventError(`Duplicate idempotency key: ${event.idempotencyKey}`);
     }
 
-    this.events.push(event);
-    this.eventIds.add(event.id);
+    const snapshot = deepFreeze(deepClone(event));
 
-    if (event.idempotencyKey !== null) {
-      this.idempotencyKeys.add(event.idempotencyKey);
+    this.events.push(snapshot);
+    this.eventIds.add(snapshot.id);
+
+    if (snapshot.idempotencyKey !== null) {
+      this.idempotencyKeys.add(snapshot.idempotencyKey);
     }
   }
 
