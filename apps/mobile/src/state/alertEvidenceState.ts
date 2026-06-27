@@ -43,6 +43,16 @@ export interface AlertEvidenceSummary {
   errorLabel: string;
 }
 
+export interface BridgeSupervisorDisplaySummary {
+  statusLabel: string;
+  gateLabel: string;
+  detailLabel: string;
+  tabLabel: string;
+  backoffLabel: string;
+  failureLabel: string;
+  blocking: boolean;
+}
+
 export interface AlertEvidenceState {
   snapshot: AlertEvidenceSnapshot;
   activeRequestId: number;
@@ -91,6 +101,25 @@ export function buildAlertEvidenceSummary(snapshot: AlertEvidenceSnapshot): Aler
     }`,
     lastCheckLabel: snapshot.evidence.checkedAt ? `Checked ${snapshot.evidence.checkedAt}` : "Never checked",
     errorLabel: snapshot.lastError,
+  };
+}
+
+export function buildBridgeSupervisorSummary(snapshot: AlertEvidenceSnapshot): BridgeSupervisorDisplaySummary {
+  const supervisor = snapshot.evidence.bridgeHealth.supervisor;
+  const healthy = supervisor.state === "healthy";
+  return {
+    statusLabel: formatSupervisorStatusLabel(supervisor.state),
+    gateLabel: healthy ? "Supervisor clear" : "Blocks live",
+    detailLabel: formatSupervisorDetailLabel(supervisor.source, supervisor.reason),
+    tabLabel: formatSupervisorTabLabel(
+      supervisor.supervisedTabs,
+      supervisor.restartedTabs,
+      supervisor.discordTabs,
+      supervisor.configuredTargets,
+    ),
+    backoffLabel: formatSupervisorBackoffLabel(supervisor.restartAttempt, supervisor.nextRestartAt, supervisor.state),
+    failureLabel: formatSupervisorFailureLabel(supervisor.failures),
+    blocking: !healthy,
   };
 }
 
@@ -204,6 +233,76 @@ function formatBridgeHealthLabel(status: "healthy" | "unhealthy" | "unknown"): s
     case "unknown":
       return "Unknown";
   }
+}
+
+function formatSupervisorStatusLabel(state: string): string {
+  switch (state) {
+    case "healthy":
+      return "Supervisor healthy";
+    case "backoff":
+      return "Supervisor backoff";
+    case "disabled":
+      return "Supervisor disabled";
+    case "attention":
+      return "Supervisor attention";
+    default:
+      return "Supervisor unknown";
+  }
+}
+
+function formatSupervisorDetailLabel(source: string, reason: string): string {
+  if (source && reason) {
+    return `${source} - ${reason}`;
+  }
+  if (source) {
+    return source;
+  }
+  if (reason) {
+    return reason;
+  }
+  return "No supervisor heartbeat";
+}
+
+function formatSupervisorTabLabel(
+  supervisedTabs: number | null,
+  restartedTabs: number | null,
+  discordTabs: number | null,
+  configuredTargets: number | null,
+): string {
+  if (supervisedTabs !== null || restartedTabs !== null) {
+    return `Tabs: ${supervisedTabs ?? 0} supervised, ${restartedTabs ?? 0} restarted`;
+  }
+  if (discordTabs !== null || configuredTargets !== null) {
+    return `Tabs: ${discordTabs ?? 0} Discord, ${configuredTargets ?? 0} target(s)`;
+  }
+  return "Tabs: not reported";
+}
+
+function formatSupervisorBackoffLabel(
+  restartAttempt: number | null,
+  nextRestartAt: string,
+  state: string,
+): string {
+  if (restartAttempt !== null && nextRestartAt) {
+    return `Backoff attempt ${restartAttempt}, next retry ${nextRestartAt}`;
+  }
+  if (restartAttempt !== null) {
+    return `Backoff attempt ${restartAttempt}, next retry not reported`;
+  }
+  if (nextRestartAt) {
+    return `Backoff next retry ${nextRestartAt}`;
+  }
+  if (state === "healthy") {
+    return "Backoff idle";
+  }
+  if (state === "backoff") {
+    return "Backoff active, next retry not reported";
+  }
+  return "Backoff not reported";
+}
+
+function formatSupervisorFailureLabel(failures: string[]): string {
+  return failures.length > 0 ? `Failures: ${failures.join("; ")}` : "Failures: none";
 }
 
 function formatStatusLabel(status: string): string {

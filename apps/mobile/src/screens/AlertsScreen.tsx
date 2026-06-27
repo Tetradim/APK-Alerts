@@ -3,7 +3,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
-import { buildAlertEvidenceSummary, useAlertEvidenceState } from "@/state/alertEvidenceState";
+import {
+  buildAlertEvidenceSummary,
+  buildBridgeSupervisorSummary,
+  useAlertEvidenceState,
+} from "@/state/alertEvidenceState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
 
 function healthTone(label: string): "good" | "warn" | "bad" | "neutral" {
@@ -26,12 +30,17 @@ function decisionTone(status: string): "good" | "warn" | "bad" | "neutral" {
   return "neutral";
 }
 
+function supervisorTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
+}
+
 export function AlertsScreen() {
   const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
   const snapshot = useAlertEvidenceState((state) => state.snapshot);
   const updateConnectionDraft = useAlertEvidenceState((state) => state.updateConnectionDraft);
   const refreshEvidence = useAlertEvidenceState((state) => state.refreshEvidence);
   const summary = buildAlertEvidenceSummary(snapshot);
+  const supervisor = buildBridgeSupervisorSummary(snapshot);
 
   useEffect(() => {
     if (
@@ -64,6 +73,20 @@ export function AlertsScreen() {
       <View style={styles.tileRow}>
         <MetricTile label="Bridge" value={summary.bridgeHealthLabel} detail={summary.bridgeHealthDetail} />
         <MetricTile label="Evidence" value={summary.evidenceCountLabel} detail={summary.liveReadinessLabel} />
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Bridge supervisor</Text>
+            <Text style={styles.panelTitle}>{supervisor.statusLabel}</Text>
+          </View>
+          <StatusPill label={supervisor.gateLabel} tone={supervisorTone(supervisor.blocking)} />
+        </View>
+        <Text style={styles.detail}>{supervisor.detailLabel}</Text>
+        <Text style={styles.detail}>{supervisor.tabLabel}</Text>
+        <Text style={styles.detail}>{supervisor.backoffLabel}</Text>
+        <Text style={styles.detail}>{supervisor.failureLabel}</Text>
       </View>
 
       <View style={styles.panel}>

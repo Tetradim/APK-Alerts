@@ -103,6 +103,23 @@ export interface BridgeHeartbeat {
   details: Record<string, unknown>;
 }
 
+export type BridgeSupervisorState = "healthy" | "backoff" | "disabled" | "attention" | "unknown";
+
+export interface BridgeSupervisorHealth {
+  state: BridgeSupervisorState;
+  source: string;
+  reason: string;
+  supervisedTabs: number | null;
+  restartedTabs: number | null;
+  discordTabs: number | null;
+  configuredTargets: number | null;
+  restartAttempt: number | null;
+  nextRestartAt: string;
+  failures: string[];
+  error: string;
+  lastEventId: string;
+}
+
 export interface BridgeHealth {
   healthy: boolean;
   status: "healthy" | "unhealthy" | "unknown";
@@ -110,6 +127,7 @@ export interface BridgeHealth {
   lastHeartbeat: BridgeHeartbeat;
   ageSeconds: number | null;
   staleAfterSeconds: number | null;
+  supervisor: BridgeSupervisorHealth;
 }
 
 export interface AlertEvidenceChain {
@@ -211,13 +229,16 @@ export function normalizeBridgeAlertDecisionEvent(input: unknown): BridgeAlertDe
 
 export function normalizeBridgeHealthPayload(input: unknown): BridgeHealth {
   const payload = asRecord(input);
+  const lastHeartbeat = normalizeBridgeHeartbeat(payload.last_heartbeat);
+  const status = normalizeBridgeHealthStatus(payload.status);
   return {
     healthy: exactBoolean(payload.healthy),
-    status: normalizeBridgeHealthStatus(payload.status),
+    status,
     issues: stringArray(payload.issues),
-    lastHeartbeat: normalizeBridgeHeartbeat(payload.last_heartbeat),
+    lastHeartbeat,
     ageSeconds: finiteNumberOrNull(payload.age_seconds),
     staleAfterSeconds: finiteNumberOrNull(payload.stale_after_seconds),
+    supervisor: normalizeBridgeSupervisorHealth(lastHeartbeat, status),
   };
 }
 
@@ -313,6 +334,56 @@ function normalizeBridgeHeartbeat(input: unknown): BridgeHeartbeat {
   };
 }
 
+function normalizeBridgeSupervisorHealth(
+  heartbeat: BridgeHeartbeat,
+  healthStatus: BridgeHealth["status"],
+): BridgeSupervisorHealth {
+  const details = heartbeat.details;
+  const failures = stringArray(details.failures);
+  const error = text(details.error);
+  return {
+    state: classifyBridgeSupervisorState(heartbeat, healthStatus),
+    source: text(details.source),
+    reason: text(details.reason),
+    supervisedTabs: nonNegativeIntegerOrNull(details.supervised_tabs),
+    restartedTabs: nonNegativeIntegerOrNull(details.restarted_tabs),
+    discordTabs: nonNegativeIntegerOrNull(details.discord_tabs),
+    configuredTargets: nonNegativeIntegerOrNull(details.configured_targets),
+    restartAttempt: firstNonNegativeIntegerOrNull(details.restart_attempt, details.bridge_restart_attempt),
+    nextRestartAt: firstText(text(details.next_restart_at), text(details.nextRestartAt)),
+    failures: failures.length > 0 ? failures : error ? [error] : [],
+    error,
+    lastEventId: text(details.last_event_id),
+  };
+}
+
+function classifyBridgeSupervisorState(
+  heartbeat: BridgeHeartbeat,
+  healthStatus: BridgeHealth["status"],
+): BridgeSupervisorState {
+  if (!heartbeat.status && !heartbeat.observedAt) {
+    return "unknown";
+  }
+  if (!heartbeat.bridgeEnabled || heartbeat.status === "disabled" || text(heartbeat.details.supervisor) === "disabled") {
+    return "disabled";
+  }
+  if (
+    heartbeat.status === "restart_error" ||
+    heartbeat.status === "forward_error" ||
+    heartbeat.status === "no_discord_tabs" ||
+    heartbeat.status === "no_matching_discord_tabs"
+  ) {
+    return "backoff";
+  }
+  if (healthStatus === "healthy" && heartbeat.status === "ok") {
+    return "healthy";
+  }
+  if (healthStatus === "unhealthy") {
+    return "attention";
+  }
+  return "unknown";
+}
+
 function normalizeParserConfidence(input: unknown): ParserConfidence {
   const value = text(input).toLowerCase();
   return value === "low" || value === "medium" || value === "high" ? value : "none";
@@ -373,4 +444,18 @@ function finiteNumberOrNull(input: unknown): number | null {
 
 function nonNegativeInteger(input: unknown): number {
   return typeof input === "number" && Number.isInteger(input) && input > 0 ? input : 0;
+}
+
+function nonNegativeIntegerOrNull(input: unknown): number | null {
+  return typeof input === "number" && Number.isInteger(input) && input >= 0 ? input : null;
+}
+
+function firstNonNegativeIntegerOrNull(...values: unknown[]): number | null {
+  for (const value of values) {
+    const normalized = nonNegativeIntegerOrNull(value);
+    if (normalized !== null) {
+      return normalized;
+    }
+  }
+  return null;
 }

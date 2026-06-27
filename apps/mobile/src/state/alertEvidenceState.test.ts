@@ -8,6 +8,7 @@ import {
   normalizeBridgeSignalEvent,
 } from "@apk-alerts/contracts";
 import {
+  buildBridgeSupervisorSummary,
   buildAlertEvidenceSummary,
   createAlertEvidenceStore,
   getDefaultAlertEvidenceSnapshot,
@@ -169,6 +170,102 @@ test("bridge health issues surface as operator warning", () => {
 
   assert.equal(summary.bridgeHealthLabel, "Unhealthy");
   assert.equal(summary.bridgeHealthDetail, "chrome bridge is disabled");
+});
+
+test("bridge supervisor summary surfaces healthy service worker supervision", () => {
+  const summary = buildBridgeSupervisorSummary({
+    ...getDefaultAlertEvidenceSnapshot(),
+    evidence: evidenceSnapshot({
+      bridgeHealth: normalizeBridgeHealthPayload({
+        healthy: true,
+        status: "healthy",
+        issues: [],
+        last_heartbeat: {
+          status: "ok",
+          bridge_enabled: true,
+          channel_id: "chrome-extension-service-worker",
+          details: {
+            source: "service_worker",
+            reason: "alarm",
+            supervised_tabs: 1,
+            restarted_tabs: 0,
+          },
+        },
+      }),
+    }),
+  });
+
+  assert.equal(summary.statusLabel, "Supervisor healthy");
+  assert.equal(summary.gateLabel, "Supervisor clear");
+  assert.equal(summary.detailLabel, "service_worker - alarm");
+  assert.equal(summary.tabLabel, "Tabs: 1 supervised, 0 restarted");
+  assert.equal(summary.backoffLabel, "Backoff idle");
+  assert.equal(summary.failureLabel, "Failures: none");
+  assert.equal(summary.blocking, false);
+});
+
+test("bridge supervisor summary surfaces restart backoff and failures", () => {
+  const summary = buildBridgeSupervisorSummary({
+    ...getDefaultAlertEvidenceSnapshot(),
+    evidence: evidenceSnapshot({
+      bridgeHealth: normalizeBridgeHealthPayload({
+        healthy: false,
+        status: "unhealthy",
+        issues: ["chrome bridge reported restart_error"],
+        last_heartbeat: {
+          status: "restart_error",
+          bridge_enabled: true,
+          channel_id: "chrome-extension-service-worker",
+          details: {
+            source: "service_worker",
+            reason: "consolidation-bridge-supervisor",
+            failures: ["content script did not respond after restart"],
+            restart_attempt: 2,
+            next_restart_at: "2026-06-27T17:05:00.000Z",
+          },
+        },
+      }),
+    }),
+  });
+
+  assert.equal(summary.statusLabel, "Supervisor backoff");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.backoffLabel, "Backoff attempt 2, next retry 2026-06-27T17:05:00.000Z");
+  assert.equal(summary.failureLabel, "Failures: content script did not respond after restart");
+  assert.equal(summary.blocking, true);
+});
+
+test("bridge supervisor summary treats disabled supervisor as blocking", () => {
+  const summary = buildBridgeSupervisorSummary({
+    ...getDefaultAlertEvidenceSnapshot(),
+    evidence: evidenceSnapshot({
+      bridgeHealth: normalizeBridgeHealthPayload({
+        healthy: false,
+        status: "unhealthy",
+        issues: ["chrome bridge is disabled"],
+        last_heartbeat: {
+          status: "disabled",
+          bridge_enabled: false,
+          details: { source: "service_worker", reason: "settings_changed", supervisor: "disabled" },
+        },
+      }),
+    }),
+  });
+
+  assert.equal(summary.statusLabel, "Supervisor disabled");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.detailLabel, "service_worker - settings_changed");
+  assert.equal(summary.blocking, true);
+});
+
+test("bridge supervisor summary treats missing heartbeat as unknown and blocking", () => {
+  const summary = buildBridgeSupervisorSummary(getDefaultAlertEvidenceSnapshot());
+
+  assert.equal(summary.statusLabel, "Supervisor unknown");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.detailLabel, "No supervisor heartbeat");
+  assert.equal(summary.backoffLabel, "Backoff not reported");
+  assert.equal(summary.blocking, true);
 });
 
 test("alert evidence store refreshes and clears stale evidence on connection edit", async () => {

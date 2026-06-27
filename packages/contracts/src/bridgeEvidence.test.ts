@@ -209,6 +209,65 @@ test("bridge health normalizes disabled stale heartbeat as unhealthy", () => {
   assert.equal(health.ageSeconds, 120);
 });
 
+test("bridge health normalizes service worker supervisor backoff evidence", () => {
+  const health = normalizeBridgeHealthPayload({
+    healthy: false,
+    status: "unhealthy",
+    issues: ["chrome bridge reported restart_error"],
+    age_seconds: 12,
+    stale_after_seconds: 90,
+    last_heartbeat: {
+      status: "restart_error",
+      bridge_enabled: true,
+      channel_id: "chrome-extension-service-worker",
+      observed_at: "2026-06-27T17:04:00.000Z",
+      details: {
+        source: "service_worker",
+        reason: "consolidation-bridge-supervisor",
+        failures: ["content script did not respond after restart"],
+        discord_tabs: 2,
+        configured_targets: 1,
+        restart_attempt: 3,
+        next_restart_at: "2026-06-27T17:05:00.000Z",
+      },
+    },
+  });
+
+  assert.equal(health.supervisor.state, "backoff");
+  assert.equal(health.supervisor.source, "service_worker");
+  assert.equal(health.supervisor.reason, "consolidation-bridge-supervisor");
+  assert.deepEqual(health.supervisor.failures, ["content script did not respond after restart"]);
+  assert.equal(health.supervisor.discordTabs, 2);
+  assert.equal(health.supervisor.configuredTargets, 1);
+  assert.equal(health.supervisor.restartAttempt, 3);
+  assert.equal(health.supervisor.nextRestartAt, "2026-06-27T17:05:00.000Z");
+});
+
+test("bridge health normalizes healthy supervisor tab counts", () => {
+  const health = normalizeBridgeHealthPayload({
+    healthy: true,
+    status: "healthy",
+    issues: [],
+    last_heartbeat: {
+      status: "ok",
+      bridge_enabled: true,
+      channel_id: "chrome-extension-service-worker",
+      observed_at: "2026-06-27T17:04:00.000Z",
+      details: {
+        source: "service_worker",
+        reason: "alarm",
+        supervised_tabs: 1,
+        restarted_tabs: 0,
+      },
+    },
+  });
+
+  assert.equal(health.supervisor.state, "healthy");
+  assert.equal(health.supervisor.supervisedTabs, 1);
+  assert.equal(health.supervisor.restartedTabs, 0);
+  assert.equal(health.supervisor.failures.length, 0);
+});
+
 test("duplicate bridge events remain visible but not executable evidence", () => {
   const duplicate = normalizeBridgeSignalEvent({
     ...signalEvent,
