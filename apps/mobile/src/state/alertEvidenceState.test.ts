@@ -1,0 +1,197 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+  buildAlertEvidenceChains,
+  normalizeBridgeAlertDecisionEvent,
+  normalizeBridgeHealthPayload,
+  normalizeBridgeSignalEvent,
+} from "@apk-alerts/contracts";
+import {
+  buildAlertEvidenceSummary,
+  createAlertEvidenceStore,
+  getDefaultAlertEvidenceSnapshot,
+  type AlertEvidenceChecker,
+} from "./alertEvidenceState.js";
+
+const signal = normalizeBridgeSignalEvent({
+  event_id: "bus-1",
+  event_type: "signal.observed",
+  source_bot: "chrome-discord-bridge",
+  created_at: "2026-06-27T17:00:00.000Z",
+  correlation_id: "chrome-message-1",
+  payload: {
+    contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+    event_id: "chrome-message-1",
+    channel_id: "chrome-alerts",
+    channel_name: "chrome-alerts",
+    author_id: "mike",
+    author_name: "MikeInvesting",
+    raw_text: "BTO SPY 500C 6/21 @ 1.25",
+    parser_metadata: { confidence: "high" },
+    ingestion_result: {
+      status: "accepted",
+      alert_inserted: true,
+      alert_id: "alert-1",
+      trade_requested: false,
+      trade_request_reason: "auto trading disabled",
+      skip_reason: "",
+    },
+  },
+});
+
+const acceptedDecision = normalizeBridgeAlertDecisionEvent({
+  id: "audit-1",
+  category: "alert_ingestion",
+  action: "bridge_alert_decision",
+  summary: "Chrome bridge alert accepted.",
+  severity: "info",
+  created_at: "2026-06-27T17:00:01.000Z",
+  details: {
+    contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+    event_id: "chrome-message-1",
+    channel: { id: "chrome-alerts", name: "chrome-alerts" },
+    author: { id: "mike", name: "MikeInvesting" },
+    raw_text: "BTO SPY 500C 6/21 @ 1.25",
+    parser: { confidence: "high" },
+    source: {
+      override_matched: true,
+      min_parser_confidence: "medium",
+      observed_parser_confidence: "high",
+      parser_confidence_allowed: true,
+      channel_url_allowed: true,
+      author_id_allowed: true,
+      metadata_policy_passed: true,
+    },
+    decision: {
+      status: "accepted",
+      alert_inserted: true,
+      alert_id: "alert-1",
+      trade_requested: false,
+      trade_request_reason: "auto trading disabled",
+      skip_reason: "",
+    },
+  },
+});
+
+function evidenceSnapshot(overrides = {}) {
+  const chains = buildAlertEvidenceChains({ signals: [signal], decisions: [acceptedDecision] });
+  return {
+    checkedAt: "2026-06-27T17:02:00.000Z",
+    bridgeHealth: normalizeBridgeHealthPayload({
+      healthy: true,
+      status: "healthy",
+      issues: [],
+      last_heartbeat: { bridge_enabled: true, channel_id: "chrome-alerts" },
+    }),
+    signals: [signal],
+    decisions: [acceptedDecision],
+    chains,
+    ...overrides,
+  };
+}
+
+test("default alert evidence summary is unpaired and does not invent alerts", () => {
+  const summary = buildAlertEvidenceSummary(getDefaultAlertEvidenceSnapshot());
+
+  assert.equal(summary.connectionLabel, "Not paired");
+  assert.equal(summary.bridgeHealthLabel, "Unknown");
+  assert.equal(summary.latestAlertLabel, "No alert evidence");
+  assert.equal(summary.liveReadinessLabel, "Live readiness not proven");
+});
+
+test("accepted alert evidence summarizes audit-only execution state", () => {
+  const summary = buildAlertEvidenceSummary({
+    ...getDefaultAlertEvidenceSnapshot(),
+    connection: { baseApiUrl: "http://100.90.10.11:8001/api", apiKey: "secret", transport: "tailscale" },
+    evidence: evidenceSnapshot(),
+  });
+
+  assert.equal(summary.connectionLabel, "Tailscale");
+  assert.equal(summary.bridgeHealthLabel, "Healthy");
+  assert.equal(summary.latestAlertLabel, "Accepted - chrome-message-1");
+  assert.equal(summary.latestDecisionLabel, "auto trading disabled");
+  assert.equal(summary.liveReadinessLabel, "Audit only - live readiness not proven");
+});
+
+test("skipped alert evidence surfaces parser and source skip reason", () => {
+  const skippedDecision = normalizeBridgeAlertDecisionEvent({
+    ...acceptedDecision,
+    id: "audit-low-confidence",
+    severity: "warning",
+    details: {
+      ...acceptedDecision,
+      event_id: "chrome-message-1",
+      parser: { confidence: "low" },
+      source: {
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "low",
+        parser_confidence_allowed: false,
+        channel_url_allowed: true,
+        author_id_allowed: true,
+        metadata_policy_passed: false,
+      },
+      decision: {
+        status: "skipped",
+        alert_inserted: false,
+        alert_id: "",
+        trade_requested: false,
+        trade_request_reason: "",
+        skip_reason: "parser confidence low below required medium",
+      },
+    },
+  });
+  const summary = buildAlertEvidenceSummary({
+    ...getDefaultAlertEvidenceSnapshot(),
+    evidence: evidenceSnapshot({
+      decisions: [skippedDecision],
+      chains: buildAlertEvidenceChains({ signals: [signal], decisions: [skippedDecision] }),
+    }),
+  });
+
+  assert.equal(summary.latestAlertLabel, "Skipped - chrome-message-1");
+  assert.equal(summary.latestDecisionLabel, "parser confidence low below required medium");
+});
+
+test("bridge health issues surface as operator warning", () => {
+  const summary = buildAlertEvidenceSummary({
+    ...getDefaultAlertEvidenceSnapshot(),
+    evidence: evidenceSnapshot({
+      bridgeHealth: normalizeBridgeHealthPayload({
+        healthy: false,
+        status: "unhealthy",
+        issues: ["chrome bridge is disabled"],
+        last_heartbeat: { bridge_enabled: false },
+      }),
+    }),
+  });
+
+  assert.equal(summary.bridgeHealthLabel, "Unhealthy");
+  assert.equal(summary.bridgeHealthDetail, "chrome bridge is disabled");
+});
+
+test("alert evidence store refreshes and clears stale evidence on connection edit", async () => {
+  const checker: AlertEvidenceChecker = async (config) => {
+    assert.equal(config.baseApiUrl, "http://100.90.10.11:8001/api");
+    assert.equal(config.apiKey, "secret");
+    return { ok: true, snapshot: evidenceSnapshot(), error: "" };
+  };
+  const store = createAlertEvidenceStore(checker);
+
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "http://100.90.10.11:8001/api",
+    apiKey: "secret",
+  });
+  await store.getState().refreshEvidence();
+  assert.equal(store.getState().snapshot.evidence.chains.length, 1);
+
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "https://relay.example.com/api",
+    apiKey: "next",
+  });
+
+  assert.equal(store.getState().snapshot.connection.transport, "cloud_relay");
+  assert.equal(store.getState().snapshot.evidence.chains.length, 0);
+  assert.equal(store.getState().snapshot.lastError, "");
+});

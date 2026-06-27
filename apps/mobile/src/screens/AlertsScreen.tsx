@@ -1,0 +1,153 @@
+import { useEffect } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { MetricTile } from "@/components/MetricTile";
+import { ScreenFrame } from "@/components/ScreenFrame";
+import { StatusPill } from "@/components/StatusPill";
+import { buildAlertEvidenceSummary, useAlertEvidenceState } from "@/state/alertEvidenceState";
+import { useRemoteEngineState } from "@/state/remoteEngineState";
+
+function healthTone(label: string): "good" | "warn" | "bad" | "neutral" {
+  if (label === "Healthy") {
+    return "good";
+  }
+  if (label === "Unhealthy") {
+    return "bad";
+  }
+  return "neutral";
+}
+
+function decisionTone(status: string): "good" | "warn" | "bad" | "neutral" {
+  if (status === "accepted") {
+    return "good";
+  }
+  if (status === "skipped" || status === "duplicate") {
+    return "warn";
+  }
+  return "neutral";
+}
+
+export function AlertsScreen() {
+  const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
+  const snapshot = useAlertEvidenceState((state) => state.snapshot);
+  const updateConnectionDraft = useAlertEvidenceState((state) => state.updateConnectionDraft);
+  const refreshEvidence = useAlertEvidenceState((state) => state.refreshEvidence);
+  const summary = buildAlertEvidenceSummary(snapshot);
+
+  useEffect(() => {
+    if (
+      remoteConnection.baseApiUrl !== snapshot.connection.baseApiUrl ||
+      remoteConnection.apiKey !== snapshot.connection.apiKey
+    ) {
+      updateConnectionDraft({
+        baseApiUrl: remoteConnection.baseApiUrl,
+        apiKey: remoteConnection.apiKey,
+      });
+    }
+  }, [
+    remoteConnection.baseApiUrl,
+    remoteConnection.apiKey,
+    snapshot.connection.baseApiUrl,
+    snapshot.connection.apiKey,
+    updateConnectionDraft,
+  ]);
+
+  return (
+    <ScreenFrame title="Alerts" eyebrow="APK-Alerts">
+      <View style={styles.headerRow}>
+        <View style={styles.headerCopy}>
+          <Text style={styles.label}>Remote evidence</Text>
+          <Text style={styles.heading}>{summary.connectionLabel}</Text>
+        </View>
+        <StatusPill label={summary.bridgeHealthLabel} tone={healthTone(summary.bridgeHealthLabel)} />
+      </View>
+
+      <View style={styles.tileRow}>
+        <MetricTile label="Bridge" value={summary.bridgeHealthLabel} detail={summary.bridgeHealthDetail} />
+        <MetricTile label="Evidence" value={summary.evidenceCountLabel} detail={summary.liveReadinessLabel} />
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Last check</Text>
+            <Text style={styles.value}>{summary.lastCheckLabel}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: snapshot.checking, disabled: snapshot.checking }}
+            disabled={snapshot.checking}
+            onPress={() => void refreshEvidence()}
+            style={[styles.button, snapshot.checking ? styles.buttonDisabled : null]}
+          >
+            <Text style={styles.buttonText}>{snapshot.checking ? "Checking" : "Refresh"}</Text>
+          </Pressable>
+        </View>
+        {summary.errorLabel ? <Text style={styles.error}>{summary.errorLabel}</Text> : null}
+      </View>
+
+      {snapshot.evidence.chains.length === 0 ? (
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>No alert evidence</Text>
+          <Text style={styles.detail}>
+            Pair a Remote Engine and refresh to show Chrome bridge observations, parser confidence,
+            source-policy proof, audit decisions, and execution state from Consolidation.
+          </Text>
+        </View>
+      ) : (
+        snapshot.evidence.chains.map((chain) => (
+          <View key={chain.eventId} style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.label}>{chain.channelName || "Unknown source"}</Text>
+                <Text style={styles.panelTitle}>{chain.rawText || chain.eventId}</Text>
+              </View>
+              <StatusPill label={chain.status} tone={decisionTone(chain.status)} />
+            </View>
+            <Text style={styles.detail}>Author: {chain.authorName || "unknown"}</Text>
+            <Text style={styles.detail}>Parser confidence: {chain.parserConfidence}</Text>
+            <Text style={styles.detail}>Decision: {chain.latestReason || "No decision reason"}</Text>
+            {chain.decision ? (
+              <Text style={styles.detail}>
+                Source proof: {chain.decision.source.metadataPolicyPassed ? "passed" : "blocked"} -
+                parser {chain.decision.source.parserConfidenceAllowed ? "allowed" : "blocked"},
+                channel {chain.decision.source.channelUrlAllowed ? "allowed" : "blocked"},
+                author {chain.decision.source.authorIdAllowed ? "allowed" : "blocked"}
+              </Text>
+            ) : null}
+            <Text style={styles.auditText}>
+              event {chain.eventId}
+              {chain.signal?.busEventId ? ` - bus ${chain.signal.busEventId}` : ""}
+              {chain.decision?.auditEventId ? ` - audit ${chain.decision.auditEventId}` : ""}
+            </Text>
+          </View>
+        ))
+      )}
+    </ScreenFrame>
+  );
+}
+
+const styles = StyleSheet.create({
+  headerRow: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  panelHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  headerCopy: { flex: 1 },
+  label: { color: "#94a3b8", fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
+  heading: { color: "#f8fafc", fontSize: 24, fontWeight: "900", marginTop: 4 },
+  tileRow: { flexDirection: "row", gap: 10 },
+  panel: { backgroundColor: "#111827", borderColor: "#334155", borderRadius: 8, borderWidth: 1, gap: 10, padding: 14 },
+  panelTitle: { color: "#f8fafc", fontSize: 16, fontWeight: "900" },
+  value: { color: "#f8fafc", fontSize: 16, fontWeight: "900", marginTop: 4 },
+  detail: { color: "#cbd5e1", fontSize: 13, lineHeight: 19 },
+  auditText: { color: "#94a3b8", fontSize: 12, lineHeight: 18 },
+  error: { color: "#fca5a5", fontSize: 13, fontWeight: "800" },
+  button: {
+    alignItems: "center",
+    backgroundColor: "#2563eb",
+    borderRadius: 8,
+    minHeight: 44,
+    justifyContent: "center",
+    minWidth: 104,
+    paddingHorizontal: 12,
+  },
+  buttonDisabled: { opacity: 0.55 },
+  buttonText: { color: "#ffffff", fontSize: 14, fontWeight: "900", textAlign: "center" },
+});
