@@ -224,6 +224,12 @@ function buildAlertCaptureProofSummary(chain: AlertEvidenceChain): { passed: boo
   if (!chain.signal) {
     return { passed: true, label: formatAlertTestCaptureLabel(chain) };
   }
+  if (!chain.signal.capturePath && !chain.signal.messageUrl) {
+    return { passed: false, label: "Physical capture proof missing" };
+  }
+  if (!chain.signal.messageUrl) {
+    return { passed: false, label: "Discord message URL proof missing" };
+  }
   if (chain.signal.capturePath) {
     return { passed: true, label: `Capture ${chain.signal.capturePath}` };
   }
