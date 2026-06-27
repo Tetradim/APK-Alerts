@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SettingsSummary } from "./settingsState.js";
+import type { SettingsSummary } from "./settingsState";
 
 export type ActiveEngine = "phone" | "remote" | "none";
 export type EngineHealth = "healthy" | "degraded" | "offline" | "unknown";

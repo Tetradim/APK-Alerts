@@ -1,3 +1,3 @@
-export * from "./events.js";
-export * from "./lease.js";
-export * from "./settings.js";
+export * from "./events";
+export * from "./lease";
+export * from "./settings";

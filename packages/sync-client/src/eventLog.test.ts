@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildIdempotencyKey, createEvent } from "@apk-alerts/contracts";
-import { DuplicateEventError, InMemoryEventLog, UnknownCursorError } from "./eventLog.js";
+import { DuplicateEventError, InMemoryEventLog, UnknownCursorError } from "./eventLog";
 
 test("event log appends events and reads them after a cursor", () => {
   const log = new InMemoryEventLog();

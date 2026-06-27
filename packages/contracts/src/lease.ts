@@ -1,4 +1,4 @@
-import type { EngineId, LeaseEvent } from "./events.js";
+import type { EngineId, LeaseEvent } from "./events";
 
 export interface ActiveLeaseState {
   leaseId: string | null;
