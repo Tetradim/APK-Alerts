@@ -16,6 +16,7 @@
     "mobile:web": "npm --workspace @apk-alerts/mobile run web"
   },
   "devDependencies": {
+    "@types/node": "^26.0.1",
     "tsx": "^4.20.6",
     "typescript": "~5.9.3"
   }
