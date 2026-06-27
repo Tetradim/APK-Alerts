@@ -11,9 +11,9 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "mobile:dev": "npm --workspace @apk-alerts/mobile run dev",
-    "mobile:android": "npm --workspace @apk-alerts/mobile run android",
-    "mobile:web": "npm --workspace @apk-alerts/mobile run web"
+    "mobile:dev": "npm --workspace @apk-alerts/mobile run dev --",
+    "mobile:android": "npm --workspace @apk-alerts/mobile run android --",
+    "mobile:web": "npm --workspace @apk-alerts/mobile run web --"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
