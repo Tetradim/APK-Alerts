@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/StatusPill";
 import {
   buildAlertEvidenceSummary,
   buildBridgeSupervisorSummary,
+  buildQueuePlaceEvidenceSummary,
   buildSourcePolicySummary,
   useAlertEvidenceState,
 } from "@/state/alertEvidenceState";
@@ -37,6 +38,10 @@ function supervisorTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" 
 
 function sourcePolicyTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
   return blocking ? "bad" : "good";
+}
+
+function queuePlaceTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "warn" : "good";
 }
 
 export function AlertsScreen() {
@@ -124,6 +129,7 @@ export function AlertsScreen() {
       ) : (
         snapshot.evidence.chains.map((chain) => {
           const sourcePolicy = buildSourcePolicySummary(chain);
+          const queuePlace = buildQueuePlaceEvidenceSummary(chain);
           return (
             <View key={chain.eventId} style={styles.panel}>
               <View style={styles.panelHeader}>
@@ -136,6 +142,15 @@ export function AlertsScreen() {
               <Text style={styles.detail}>Author: {chain.authorName || "unknown"}</Text>
               <Text style={styles.detail}>Parser confidence: {chain.parserConfidence}</Text>
               <Text style={styles.detail}>Decision: {chain.latestReason || "No decision reason"}</Text>
+              <View style={styles.evidenceHeader}>
+                <Text style={styles.label}>Queue / place evidence</Text>
+                <StatusPill label={queuePlace.gateLabel} tone={queuePlaceTone(queuePlace.blocking)} />
+              </View>
+              <Text style={styles.detail}>{queuePlace.statusLabel}</Text>
+              <Text style={styles.detail}>{queuePlace.alertInsertLabel}</Text>
+              <Text style={styles.detail}>{queuePlace.queueLabel}</Text>
+              <Text style={styles.detail}>{queuePlace.reasonLabel}</Text>
+              <Text style={styles.detail}>{queuePlace.auditLabel}</Text>
               <View style={styles.sourcePolicyHeader}>
                 <Text style={styles.label}>Source policy</Text>
                 <StatusPill label={sourcePolicy.gateLabel} tone={sourcePolicyTone(sourcePolicy.blocking)} />
@@ -162,6 +177,7 @@ export function AlertsScreen() {
 const styles = StyleSheet.create({
   headerRow: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   panelHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  evidenceHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between", marginTop: 2 },
   sourcePolicyHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between", marginTop: 2 },
   headerCopy: { flex: 1 },
   label: { color: "#94a3b8", fontSize: 11, fontWeight: "900", textTransform: "uppercase" },

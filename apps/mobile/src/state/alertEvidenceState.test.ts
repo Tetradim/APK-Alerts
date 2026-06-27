@@ -9,6 +9,7 @@ import {
 } from "@apk-alerts/contracts";
 import {
   buildBridgeSupervisorSummary,
+  buildQueuePlaceEvidenceSummary,
   buildSourcePolicySummary,
   buildAlertEvidenceSummary,
   createAlertEvidenceStore,
@@ -353,6 +354,112 @@ test("source policy summary fails closed when proof is missing", () => {
   assert.equal(summary.channelLabel, "Channel proof missing");
   assert.equal(summary.authorLabel, "Author proof missing");
   assert.equal(summary.executionModeLabel, "Execution mode unknown");
+  assert.equal(summary.blocking, true);
+});
+
+test("queue place summary exposes audited inserted alert and queued trade request", () => {
+  const queuedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-queued",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-1",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        override_matched: true,
+        parser_confidence_allowed: true,
+        channel_url_allowed: true,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-queued",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [queuedDecision] })[0];
+  const summary = buildQueuePlaceEvidenceSummary(chain);
+
+  assert.equal(summary.statusLabel, "Order request queued");
+  assert.equal(summary.gateLabel, "Queue proof clear");
+  assert.equal(summary.alertInsertLabel, "Alert inserted: alert-queued");
+  assert.equal(summary.queueLabel, "Trade request queued");
+  assert.equal(summary.reasonLabel, "risk approved; order intent queued");
+  assert.equal(summary.auditLabel, "Audited decision: audit-queued");
+  assert.equal(summary.blocking, false);
+});
+
+test("queue place summary exposes audited alert insertion without queued execution", () => {
+  const chain = evidenceSnapshot().chains[0];
+  const summary = buildQueuePlaceEvidenceSummary(chain);
+
+  assert.equal(summary.statusLabel, "Alert captured only");
+  assert.equal(summary.gateLabel, "No order queued");
+  assert.equal(summary.alertInsertLabel, "Alert inserted: alert-1");
+  assert.equal(summary.queueLabel, "Trade request not queued");
+  assert.equal(summary.reasonLabel, "auto trading disabled");
+  assert.equal(summary.auditLabel, "Audited decision: audit-1");
+  assert.equal(summary.blocking, true);
+});
+
+test("queue place summary exposes skipped alert as not inserted or queued", () => {
+  const skippedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-skipped",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert skipped.",
+    severity: "warning",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-1",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "low" },
+      source: { metadata_policy_passed: false },
+      decision: {
+        status: "skipped",
+        alert_inserted: false,
+        alert_id: "",
+        trade_requested: false,
+        trade_request_reason: "",
+        skip_reason: "parser confidence low below required medium",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [skippedDecision] })[0];
+  const summary = buildQueuePlaceEvidenceSummary(chain);
+
+  assert.equal(summary.statusLabel, "Alert skipped");
+  assert.equal(summary.gateLabel, "No order queued");
+  assert.equal(summary.alertInsertLabel, "Alert not inserted");
+  assert.equal(summary.queueLabel, "Trade request not queued");
+  assert.equal(summary.reasonLabel, "parser confidence low below required medium");
+  assert.equal(summary.blocking, true);
+});
+
+test("queue place summary fails closed when ingestion proof is missing", () => {
+  const summary = buildQueuePlaceEvidenceSummary(null);
+
+  assert.equal(summary.statusLabel, "Execution proof missing");
+  assert.equal(summary.gateLabel, "Blocks execution");
+  assert.equal(summary.alertInsertLabel, "Alert insert proof missing");
+  assert.equal(summary.queueLabel, "Queue proof missing");
+  assert.equal(summary.reasonLabel, "No execution decision evidence");
+  assert.equal(summary.auditLabel, "No audited decision");
   assert.equal(summary.blocking, true);
 });
 

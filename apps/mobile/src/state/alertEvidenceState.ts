@@ -64,6 +64,16 @@ export interface SourcePolicyDisplaySummary {
   blocking: boolean;
 }
 
+export interface QueuePlaceEvidenceSummary {
+  statusLabel: string;
+  gateLabel: string;
+  alertInsertLabel: string;
+  queueLabel: string;
+  reasonLabel: string;
+  auditLabel: string;
+  blocking: boolean;
+}
+
 export interface AlertEvidenceState {
   snapshot: AlertEvidenceSnapshot;
   activeRequestId: number;
@@ -131,6 +141,35 @@ export function buildBridgeSupervisorSummary(snapshot: AlertEvidenceSnapshot): B
     backoffLabel: formatSupervisorBackoffLabel(supervisor.restartAttempt, supervisor.nextRestartAt, supervisor.state),
     failureLabel: formatSupervisorFailureLabel(supervisor.failures),
     blocking: !healthy,
+  };
+}
+
+export function buildQueuePlaceEvidenceSummary(chain: AlertEvidenceChain | null | undefined): QueuePlaceEvidenceSummary {
+  const ingestion = chain?.decision?.decision ?? chain?.signal?.ingestion ?? null;
+  if (!ingestion) {
+    return {
+      statusLabel: "Execution proof missing",
+      gateLabel: "Blocks execution",
+      alertInsertLabel: "Alert insert proof missing",
+      queueLabel: "Queue proof missing",
+      reasonLabel: "No execution decision evidence",
+      auditLabel: "No audited decision",
+      blocking: true,
+    };
+  }
+
+  const audited = Boolean(chain?.decision);
+  const queued = audited && ingestion.alertInserted && ingestion.tradeRequested;
+  return {
+    statusLabel: formatQueuePlaceStatusLabel(ingestion.status, ingestion.alertInserted, ingestion.tradeRequested),
+    gateLabel: queued ? "Queue proof clear" : "No order queued",
+    alertInsertLabel: ingestion.alertInserted
+      ? `Alert inserted: ${ingestion.alertId || "id missing"}`
+      : "Alert not inserted",
+    queueLabel: ingestion.tradeRequested ? "Trade request queued" : "Trade request not queued",
+    reasonLabel: firstNonEmptyText(ingestion.tradeRequestReason, ingestion.skipReason, "No execution reason returned"),
+    auditLabel: chain?.decision?.auditEventId ? `Audited decision: ${chain.decision.auditEventId}` : "No audited decision",
+    blocking: !queued,
   };
 }
 
@@ -354,6 +393,19 @@ function formatSupervisorFailureLabel(failures: string[]): string {
   return failures.length > 0 ? `Failures: ${failures.join("; ")}` : "Failures: none";
 }
 
+function formatQueuePlaceStatusLabel(status: string, alertInserted: boolean, tradeRequested: boolean): string {
+  if (alertInserted && tradeRequested) {
+    return "Order request queued";
+  }
+  if (status === "skipped") {
+    return "Alert skipped";
+  }
+  if (alertInserted) {
+    return "Alert captured only";
+  }
+  return "Execution blocked";
+}
+
 function formatSourceIdentityLabel(name: string, key: string, overrideMatched: boolean): string {
   const sourceName = name && key ? `${name} (${key})` : name || key || "Unknown source";
   return `${sourceName} - ${overrideMatched ? "override matched" : "override missing"}`;
@@ -382,6 +434,16 @@ function formatSourceExecutionModeLabel(paperOnly: boolean, requireManualConfirm
     return "Manual confirmation required";
   }
   return "Auto-live source allowed";
+}
+
+function firstNonEmptyText(...values: string[]): string {
+  for (const value of values) {
+    const normalized = value.trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return "";
 }
 
 function formatStatusLabel(status: string): string {
