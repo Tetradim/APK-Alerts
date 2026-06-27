@@ -5,10 +5,18 @@ import {
   type RemoteEngineHealth,
   type RemoteEngineHealthSnapshot,
 } from "@apk-alerts/contracts";
-import { checkRemoteEngineHealth } from "@apk-alerts/sync-client";
-import { create } from "zustand";
+import {
+  checkRemoteEngineHealth,
+  type RemoteEngineCheckResult,
+  type RemoteEngineClientConfig,
+} from "@apk-alerts/sync-client";
+import { useStore } from "zustand";
+import { createStore } from "zustand/vanilla";
 
 export type RemoteTransport = "tailscale" | "same_wifi" | "cloud_relay" | "none";
+export type RemoteEngineChecker = (
+  config: RemoteEngineClientConfig,
+) => Promise<RemoteEngineCheckResult>;
 
 export interface RemoteConnectionDraft {
   baseApiUrl: string;
@@ -37,8 +45,10 @@ export interface RemoteEngineSummary {
   errorLabel: string;
 }
 
-interface RemoteEngineState {
+export interface RemoteEngineState {
   snapshot: RemoteEngineSnapshot;
+  activeRequestId: number;
+  nextRequestId: number;
   updateConnectionDraft: (draft: RemoteConnectionDraft) => void;
   checkRemote: () => Promise<void>;
 }
@@ -105,6 +115,10 @@ function buildOfflineRemoteSnapshot(): RemoteEngineHealthSnapshot {
   });
 }
 
+function connectionKey(connection: RemoteConnectionSettings): string {
+  return `${connection.baseApiUrl}\n${connection.apiKey}`;
+}
+
 export function getDefaultRemoteEngineSnapshot(): RemoteEngineSnapshot {
   return {
     connection: {
@@ -168,43 +182,75 @@ export function buildRemoteEngineSummary(snapshot: RemoteEngineSnapshot): Remote
   };
 }
 
-export const useRemoteEngineState = create<RemoteEngineState>((set, get) => ({
-  snapshot: getDefaultRemoteEngineSnapshot(),
-  updateConnectionDraft: (draft) => {
-    const normalized = normalizeConnectionDraft(draft);
-    set((state) => ({
-      snapshot: {
-        ...state.snapshot,
-        connection: {
-          ...normalized,
-          transport: classifyRemoteTransport(normalized.baseApiUrl),
+export function createRemoteEngineStore(checker: RemoteEngineChecker = checkRemoteEngineHealth) {
+  return createStore<RemoteEngineState>()((set, get) => ({
+    snapshot: getDefaultRemoteEngineSnapshot(),
+    activeRequestId: 0,
+    nextRequestId: 1,
+    updateConnectionDraft: (draft) => {
+      const normalized = normalizeConnectionDraft(draft);
+      set((state) => ({
+        ...state,
+        activeRequestId: 0,
+        snapshot: {
+          ...state.snapshot,
+          connection: {
+            ...normalized,
+            transport: classifyRemoteTransport(normalized.baseApiUrl),
+          },
+          remote: buildOfflineRemoteSnapshot(),
+          checking: false,
+          lastError: "",
         },
-        lastError: "",
-      },
-    }));
-  },
-  checkRemote: async () => {
-    const connection = get().snapshot.connection;
-    set((state) => ({
-      snapshot: {
-        ...state.snapshot,
-        checking: true,
-        lastError: "",
-      },
-    }));
+      }));
+    },
+    checkRemote: async () => {
+      const connection = get().snapshot.connection;
+      const requestConnectionKey = connectionKey(connection);
+      const requestId = get().nextRequestId;
+      set((state) => ({
+        ...state,
+        activeRequestId: requestId,
+        nextRequestId: state.nextRequestId + 1,
+        snapshot: {
+          ...state.snapshot,
+          checking: true,
+          lastError: "",
+        },
+      }));
 
-    const result = await checkRemoteEngineHealth({
-      baseApiUrl: connection.baseApiUrl,
-      apiKey: connection.apiKey,
-    });
+      const result = await checker({
+        baseApiUrl: connection.baseApiUrl,
+        apiKey: connection.apiKey,
+      });
 
-    set((state) => ({
-      snapshot: {
-        ...state.snapshot,
-        checking: false,
-        remote: result.snapshot,
-        lastError: result.error,
-      },
-    }));
-  },
-}));
+      set((state) => {
+        if (
+          state.activeRequestId !== requestId ||
+          connectionKey(state.snapshot.connection) !== requestConnectionKey
+        ) {
+          return state;
+        }
+
+        return {
+          ...state,
+          activeRequestId: 0,
+          snapshot: {
+            ...state.snapshot,
+            checking: false,
+            remote: result.snapshot,
+            lastError: result.error,
+          },
+        };
+      });
+    },
+  }));
+}
+
+export const remoteEngineStore = createRemoteEngineStore();
+
+export function useRemoteEngineState(): RemoteEngineState;
+export function useRemoteEngineState<T>(selector: (state: RemoteEngineState) => T): T;
+export function useRemoteEngineState<T>(selector?: (state: RemoteEngineState) => T) {
+  return selector ? useStore(remoteEngineStore, selector) : useStore(remoteEngineStore);
+}

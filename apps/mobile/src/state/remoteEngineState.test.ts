@@ -8,9 +8,46 @@ import {
 import {
   buildRemoteEngineSummary,
   classifyRemoteTransport,
+  createRemoteEngineStore,
   getDefaultRemoteEngineSnapshot,
   normalizeConnectionDraft,
+  type RemoteEngineChecker,
 } from "./remoteEngineState.js";
+
+function healthyRemoteSnapshot(checkedAt: string, alertsProcessed: number) {
+  return buildRemoteEngineHealthSnapshot({
+    health: normalizeRemoteHealthPayload({
+      status: "healthy",
+      discord_connected: true,
+      broker_connected: true,
+    }),
+    status: normalizeRemoteStatusPayload({
+      active_broker: "alpaca",
+      auto_trading_enabled: true,
+      simulation_mode: false,
+      alerts_processed: alertsProcessed,
+    }),
+    checkedAt,
+  });
+}
+
+function createDeferredCheck(snapshot = healthyRemoteSnapshot("2026-06-27T16:00:00Z", 1)) {
+  let resolveCheck: (() => void) | undefined;
+  const checker: RemoteEngineChecker = async () => {
+    await new Promise<void>((resolve) => {
+      resolveCheck = resolve;
+    });
+    return { ok: true, snapshot, error: "" };
+  };
+
+  return {
+    checker,
+    resolve: () => {
+      assert.ok(resolveCheck);
+      resolveCheck();
+    },
+  };
+}
 
 test("remote connection draft normalizes URL and trims API key", () => {
   const draft = normalizeConnectionDraft({
@@ -90,4 +127,111 @@ test("failed remote snapshot surfaces error and offline summary", () => {
   assert.equal(summary.connectionLabel, "Same Wi-Fi");
   assert.equal(summary.remoteHealthLabel, "Offline");
   assert.equal(summary.errorLabel, "HTTP 503");
+});
+
+test("remote store successful check updates remote state", async () => {
+  const checker: RemoteEngineChecker = async (config) => {
+    assert.equal(config.baseApiUrl, "http://100.90.10.11:8001/api");
+    assert.equal(config.apiKey, "secret");
+    return {
+      ok: true,
+      snapshot: healthyRemoteSnapshot("2026-06-27T16:00:00Z", 11),
+      error: "",
+    };
+  };
+  const store = createRemoteEngineStore(checker);
+
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "http://100.90.10.11:8001/api",
+    apiKey: "secret",
+  });
+  await store.getState().checkRemote();
+
+  assert.equal(store.getState().snapshot.remote.engineHealth, "healthy");
+  assert.equal(store.getState().snapshot.remote.alertsProcessed, 11);
+  assert.equal(store.getState().snapshot.checking, false);
+  assert.equal(store.getState().snapshot.lastError, "");
+});
+
+test("remote store connection edit resets remote health offline", async () => {
+  const store = createRemoteEngineStore(async () => ({
+    ok: true,
+    snapshot: healthyRemoteSnapshot("2026-06-27T16:00:00Z", 3),
+    error: "",
+  }));
+
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "http://100.90.10.11:8001/api",
+    apiKey: "secret",
+  });
+  await store.getState().checkRemote();
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "https://relay.example.com/api",
+    apiKey: "next",
+  });
+
+  assert.equal(store.getState().snapshot.connection.transport, "cloud_relay");
+  assert.equal(store.getState().snapshot.remote.engineHealth, "offline");
+  assert.equal(store.getState().snapshot.remote.checkedAt, "");
+  assert.equal(store.getState().snapshot.lastError, "");
+  assert.equal(store.getState().snapshot.checking, false);
+});
+
+test("remote store stale in-flight check does not overwrite after connection edit", async () => {
+  const deferred = createDeferredCheck(healthyRemoteSnapshot("2026-06-27T16:00:00Z", 5));
+  const store = createRemoteEngineStore(deferred.checker);
+
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "http://100.90.10.11:8001/api",
+    apiKey: "secret",
+  });
+  const check = store.getState().checkRemote();
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "https://relay.example.com/api",
+    apiKey: "next",
+  });
+  deferred.resolve();
+  await check;
+
+  assert.equal(store.getState().snapshot.connection.baseApiUrl, "https://relay.example.com/api");
+  assert.equal(store.getState().snapshot.remote.engineHealth, "offline");
+  assert.equal(store.getState().snapshot.remote.alertsProcessed, 0);
+  assert.equal(store.getState().snapshot.checking, false);
+});
+
+test("remote store older concurrent check cannot clear newer check or overwrite newer result", async () => {
+  const resolvers: Array<() => void> = [];
+  const snapshots = [
+    healthyRemoteSnapshot("2026-06-27T16:00:00Z", 1),
+    healthyRemoteSnapshot("2026-06-27T16:01:00Z", 2),
+  ];
+  const checker: RemoteEngineChecker = async () => {
+    const callIndex = resolvers.length;
+    await new Promise<void>((resolve) => {
+      resolvers.push(resolve);
+    });
+    return { ok: true, snapshot: snapshots[callIndex], error: "" };
+  };
+  const store = createRemoteEngineStore(checker);
+
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "http://100.90.10.11:8001/api",
+    apiKey: "secret",
+  });
+  const olderCheck = store.getState().checkRemote();
+  const newerCheck = store.getState().checkRemote();
+
+  assert.equal(store.getState().snapshot.checking, true);
+  resolvers[0]();
+  await olderCheck;
+
+  assert.equal(store.getState().snapshot.checking, true);
+  assert.equal(store.getState().snapshot.remote.alertsProcessed, 0);
+
+  resolvers[1]();
+  await newerCheck;
+
+  assert.equal(store.getState().snapshot.checking, false);
+  assert.equal(store.getState().snapshot.remote.alertsProcessed, 2);
+  assert.equal(store.getState().snapshot.remote.checkedAt, "2026-06-27T16:01:00Z");
 });
