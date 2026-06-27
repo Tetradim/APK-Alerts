@@ -74,6 +74,17 @@ export interface QueuePlaceEvidenceSummary {
   blocking: boolean;
 }
 
+export interface AlertTestEvidenceSummary {
+  modeLabel: string;
+  gateLabel: string;
+  parserLabel: string;
+  sourceLabel: string;
+  queueLabel: string;
+  auditLabel: string;
+  captureLabel: string;
+  blocking: boolean;
+}
+
 export interface AlertEvidenceState {
   snapshot: AlertEvidenceSnapshot;
   activeRequestId: number;
@@ -141,6 +152,38 @@ export function buildBridgeSupervisorSummary(snapshot: AlertEvidenceSnapshot): B
     backoffLabel: formatSupervisorBackoffLabel(supervisor.restartAttempt, supervisor.nextRestartAt, supervisor.state),
     failureLabel: formatSupervisorFailureLabel(supervisor.failures),
     blocking: !healthy,
+  };
+}
+
+export function buildAlertTestEvidenceSummary(chain: AlertEvidenceChain | null | undefined): AlertTestEvidenceSummary {
+  if (!chain) {
+    return {
+      modeLabel: "Alert test proof missing",
+      gateLabel: "Blocks test",
+      parserLabel: "Parser proof missing",
+      sourceLabel: "Source proof missing",
+      queueLabel: "Queue proof missing",
+      auditLabel: "Audit proof missing",
+      captureLabel: "No capture evidence",
+      blocking: true,
+    };
+  }
+
+  const source = buildSourcePolicySummary(chain);
+  const queue = buildQueuePlaceEvidenceSummary(chain);
+  const hasParserProof = chain.parserConfidence !== "none";
+  const hasAuditProof = Boolean(chain.decision?.auditEventId);
+  const clear = hasParserProof && !source.blocking && !queue.blocking && hasAuditProof;
+
+  return {
+    modeLabel: formatAlertTestModeLabel(Boolean(chain.signal), Boolean(chain.decision)),
+    gateLabel: clear ? "Test proof clear" : "Blocks test",
+    parserLabel: hasParserProof ? `Parser proof ${chain.parserConfidence}` : "Parser proof missing",
+    sourceLabel: source.statusLabel,
+    queueLabel: formatAlertTestQueueLabel(queue),
+    auditLabel: chain.decision?.auditEventId ? `Audit ${chain.decision.auditEventId}` : "Audit proof missing",
+    captureLabel: formatAlertTestCaptureLabel(chain),
+    blocking: !clear,
   };
 }
 
@@ -404,6 +447,44 @@ function formatQueuePlaceStatusLabel(status: string, alertInserted: boolean, tra
     return "Alert captured only";
   }
   return "Execution blocked";
+}
+
+function formatAlertTestModeLabel(hasSignal: boolean, hasDecision: boolean): string {
+  if (hasSignal && hasDecision) {
+    return "Physical bridge test";
+  }
+  if (hasDecision) {
+    return "Silent audit test";
+  }
+  if (hasSignal) {
+    return "Physical observation missing audit";
+  }
+  return "Alert test proof missing";
+}
+
+function formatAlertTestQueueLabel(queue: QueuePlaceEvidenceSummary): string {
+  if (!queue.blocking) {
+    return queue.statusLabel;
+  }
+  if (queue.queueLabel === "Queue proof missing") {
+    return "Queue proof missing";
+  }
+  return queue.gateLabel;
+}
+
+function formatAlertTestCaptureLabel(chain: AlertEvidenceChain): string {
+  const capturePath = firstNonEmptyText(chain.decision?.capturePath ?? "", chain.signal?.capturePath ?? "");
+  if (capturePath) {
+    return `Capture ${capturePath}`;
+  }
+  const messageUrl = firstNonEmptyText(chain.decision?.channel.messageUrl ?? "", chain.signal?.messageUrl ?? "");
+  if (messageUrl) {
+    return `Message ${messageUrl}`;
+  }
+  if (chain.decision && !chain.signal) {
+    return "No physical capture";
+  }
+  return "No capture evidence";
 }
 
 function formatSourceIdentityLabel(name: string, key: string, overrideMatched: boolean): string {

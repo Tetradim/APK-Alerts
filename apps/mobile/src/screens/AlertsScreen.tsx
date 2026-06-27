@@ -5,6 +5,7 @@ import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import {
   buildAlertEvidenceSummary,
+  buildAlertTestEvidenceSummary,
   buildBridgeSupervisorSummary,
   buildQueuePlaceEvidenceSummary,
   buildSourcePolicySummary,
@@ -42,6 +43,10 @@ function sourcePolicyTone(blocking: boolean): "good" | "warn" | "bad" | "neutral
 
 function queuePlaceTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
   return blocking ? "warn" : "good";
+}
+
+function alertTestTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
 }
 
 export function AlertsScreen() {
@@ -128,6 +133,7 @@ export function AlertsScreen() {
         </View>
       ) : (
         snapshot.evidence.chains.map((chain) => {
+          const alertTest = buildAlertTestEvidenceSummary(chain);
           const sourcePolicy = buildSourcePolicySummary(chain);
           const queuePlace = buildQueuePlaceEvidenceSummary(chain);
           return (
@@ -142,6 +148,16 @@ export function AlertsScreen() {
               <Text style={styles.detail}>Author: {chain.authorName || "unknown"}</Text>
               <Text style={styles.detail}>Parser confidence: {chain.parserConfidence}</Text>
               <Text style={styles.detail}>Decision: {chain.latestReason || "No decision reason"}</Text>
+              <View style={styles.evidenceHeader}>
+                <Text style={styles.label}>Alert test evidence</Text>
+                <StatusPill label={alertTest.gateLabel} tone={alertTestTone(alertTest.blocking)} />
+              </View>
+              <Text style={styles.detail}>{alertTest.modeLabel}</Text>
+              <Text style={styles.detail}>{alertTest.parserLabel}</Text>
+              <Text style={styles.detail}>{alertTest.sourceLabel}</Text>
+              <Text style={styles.detail}>{alertTest.queueLabel}</Text>
+              <Text style={styles.detail}>{alertTest.auditLabel}</Text>
+              <Text style={styles.detail}>{alertTest.captureLabel}</Text>
               <View style={styles.evidenceHeader}>
                 <Text style={styles.label}>Queue / place evidence</Text>
                 <StatusPill label={queuePlace.gateLabel} tone={queuePlaceTone(queuePlace.blocking)} />

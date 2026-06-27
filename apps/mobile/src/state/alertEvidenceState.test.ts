@@ -8,6 +8,7 @@ import {
   normalizeBridgeSignalEvent,
 } from "@apk-alerts/contracts";
 import {
+  buildAlertTestEvidenceSummary,
   buildBridgeSupervisorSummary,
   buildQueuePlaceEvidenceSummary,
   buildSourcePolicySummary,
@@ -460,6 +461,164 @@ test("queue place summary fails closed when ingestion proof is missing", () => {
   assert.equal(summary.queueLabel, "Queue proof missing");
   assert.equal(summary.reasonLabel, "No execution decision evidence");
   assert.equal(summary.auditLabel, "No audited decision");
+  assert.equal(summary.blocking, true);
+});
+
+test("alert test evidence summary proves a complete physical bridge alert path", () => {
+  const physicalSignal = normalizeBridgeSignalEvent({
+    event_id: "bus-physical",
+    event_type: "signal.observed",
+    source_bot: "chrome-discord-bridge",
+    created_at: "2026-06-27T17:00:00.000Z",
+    correlation_id: "chrome-message-physical",
+    payload: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-physical",
+      channel_id: "chrome-alerts",
+      channel_name: "chrome-alerts",
+      channel_url: "https://discord.com/channels/1/chrome-alerts",
+      url: "https://discord.com/channels/1/chrome-alerts/999",
+      author_id: "mike",
+      author_name: "MikeInvesting",
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parsed: { ticker: "SPY" },
+      parser_metadata: { confidence: "high" },
+      ingestion_result: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-physical",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+      capture_path: "C:/captures/chrome-message-physical.json",
+    },
+  });
+  const physicalDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-physical",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-physical",
+      channel: {
+        id: "chrome-alerts",
+        name: "chrome-alerts",
+        url: "https://discord.com/channels/1/chrome-alerts",
+        message_url: "https://discord.com/channels/1/chrome-alerts/999",
+      },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      capture_path: "C:/captures/chrome-message-physical.json",
+      parsed: { ticker: "SPY" },
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
+        channel_url_allowed: true,
+        allowed_author_id_count: 1,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-physical",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [physicalSignal], decisions: [physicalDecision] })[0];
+  const summary = buildAlertTestEvidenceSummary(chain);
+
+  assert.equal(summary.modeLabel, "Physical bridge test");
+  assert.equal(summary.gateLabel, "Test proof clear");
+  assert.equal(summary.parserLabel, "Parser proof high");
+  assert.equal(summary.sourceLabel, "Source policy passed");
+  assert.equal(summary.queueLabel, "Order request queued");
+  assert.equal(summary.auditLabel, "Audit audit-physical");
+  assert.equal(summary.captureLabel, "Capture C:/captures/chrome-message-physical.json");
+  assert.equal(summary.blocking, false);
+});
+
+test("alert test evidence summary accepts complete silent audit-only proof without pretending it was physical", () => {
+  const silentDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-silent",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Silent alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "silent-alert-1",
+      channel: { id: "silent-harness", name: "silent-harness" },
+      author: { id: "test-runner", name: "Test Runner" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parsed: { ticker: "SPY" },
+      parser: { confidence: "high" },
+      source: {
+        key: "silent-harness",
+        name: "Silent Harness",
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        channel_url_allowed: true,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-silent",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [], decisions: [silentDecision] })[0];
+  const summary = buildAlertTestEvidenceSummary(chain);
+
+  assert.equal(summary.modeLabel, "Silent audit test");
+  assert.equal(summary.gateLabel, "Test proof clear");
+  assert.equal(summary.captureLabel, "No physical capture");
+  assert.equal(summary.blocking, false);
+});
+
+test("alert test evidence summary blocks physical observation without audit decision", () => {
+  const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [] })[0];
+  const summary = buildAlertTestEvidenceSummary(chain);
+
+  assert.equal(summary.modeLabel, "Physical observation missing audit");
+  assert.equal(summary.gateLabel, "Blocks test");
+  assert.equal(summary.sourceLabel, "Source proof missing");
+  assert.equal(summary.queueLabel, "No order queued");
+  assert.equal(summary.auditLabel, "Audit proof missing");
+  assert.equal(summary.blocking, true);
+});
+
+test("alert test evidence summary fails closed when no chain exists", () => {
+  const summary = buildAlertTestEvidenceSummary(null);
+
+  assert.equal(summary.modeLabel, "Alert test proof missing");
+  assert.equal(summary.gateLabel, "Blocks test");
+  assert.equal(summary.parserLabel, "Parser proof missing");
+  assert.equal(summary.sourceLabel, "Source proof missing");
+  assert.equal(summary.queueLabel, "Queue proof missing");
+  assert.equal(summary.auditLabel, "Audit proof missing");
+  assert.equal(summary.captureLabel, "No capture evidence");
   assert.equal(summary.blocking, true);
 });
 
