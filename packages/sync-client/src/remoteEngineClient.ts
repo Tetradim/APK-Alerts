@@ -95,7 +95,7 @@ export async function checkRemoteEngineHealth(
     });
 
     return {
-      ok: snapshot.engineHealth !== "offline",
+      ok: snapshot.executionReady,
       snapshot,
       error: "",
     };

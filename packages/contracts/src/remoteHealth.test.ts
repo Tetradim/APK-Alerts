@@ -80,6 +80,36 @@ test("remote engine snapshot fails closed when health is degraded or malformed",
   assert.equal(snapshot.brokerConnected, false);
 });
 
+test("remote engine snapshot degrades when runtime status is missing or unsafe", () => {
+  const missingStatusSnapshot = buildRemoteEngineHealthSnapshot({
+    health: normalizeRemoteHealthPayload({
+      status: "healthy",
+      discord_connected: true,
+      broker_connected: true,
+    }),
+    status: normalizeRemoteStatusPayload(null),
+    checkedAt: "2026-06-27T15:00:00Z",
+  });
+  const shutdownSnapshot = buildRemoteEngineHealthSnapshot({
+    health: normalizeRemoteHealthPayload({
+      status: "healthy",
+      discord_connected: true,
+      broker_connected: true,
+    }),
+    status: normalizeRemoteStatusPayload({
+      active_broker: "ibkr",
+      auto_trading_enabled: true,
+      shutdown_triggered: true,
+    }),
+    checkedAt: "2026-06-27T15:00:00Z",
+  });
+
+  assert.equal(missingStatusSnapshot.executionReady, false);
+  assert.equal(missingStatusSnapshot.engineHealth, "degraded");
+  assert.equal(shutdownSnapshot.executionReady, false);
+  assert.equal(shutdownSnapshot.engineHealth, "degraded");
+});
+
 test("remote engine snapshot is healthy only when health, status, and runtime are ready", () => {
   const snapshot = buildRemoteEngineHealthSnapshot({
     health: normalizeRemoteHealthPayload({

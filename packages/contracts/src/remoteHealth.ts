@@ -92,13 +92,15 @@ export function normalizeRemoteStatusPayload(payload: unknown): NormalizedRemote
 export function buildRemoteEngineHealthSnapshot(
   input: RemoteEngineHealthSnapshotInput,
 ): RemoteEngineHealthSnapshot {
+  const runtimeReady = input.status.autoTradingEnabled && !input.status.shutdownTriggered;
   const executionReady =
     input.health.status === "healthy" &&
-    input.status.autoTradingEnabled &&
-    !input.status.shutdownTriggered;
+    runtimeReady;
+  const engineHealth =
+    input.health.status === "healthy" && !runtimeReady ? "degraded" : input.health.status;
 
   return {
-    engineHealth: executionReady ? "healthy" : input.health.status,
+    engineHealth,
     executionReady,
     discordConnected: input.health.discordConnected,
     brokerConnected: input.health.brokerConnected,

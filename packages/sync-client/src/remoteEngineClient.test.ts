@@ -66,6 +66,22 @@ test("remote client does not send a blank API key header", async () => {
   assert.deepEqual(headers, {});
 });
 
+test("remote client fails closed when status payload is missing runtime readiness", async () => {
+  const fetchImpl: FetchLike = async (url) =>
+    String(url).endsWith("/health")
+      ? jsonResponse({ status: "healthy", discord_connected: true, broker_connected: true })
+      : jsonResponse({});
+
+  const result = await checkRemoteEngineHealth({
+    baseApiUrl: "http://127.0.0.1:8001/api",
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.snapshot.engineHealth, "degraded");
+  assert.equal(result.snapshot.executionReady, false);
+});
+
 test("remote client returns offline failure for HTTP and network failures", async () => {
   const httpFailure = await checkRemoteEngineHealth({
     baseApiUrl: "http://127.0.0.1:8001/api",
