@@ -545,6 +545,7 @@ test("alert test evidence summary proves a complete physical bridge alert path",
 
   assert.equal(summary.modeLabel, "Physical bridge test");
   assert.equal(summary.gateLabel, "Test proof clear");
+  assert.equal(summary.contractLabel, "Contract chrome.discord.message.v1");
   assert.equal(summary.parserLabel, "Parser proof high");
   assert.equal(summary.sourceLabel, "Source policy passed");
   assert.equal(summary.queueLabel, "Order request queued");
@@ -595,8 +596,74 @@ test("alert test evidence summary accepts complete silent audit-only proof witho
 
   assert.equal(summary.modeLabel, "Silent audit test");
   assert.equal(summary.gateLabel, "Test proof clear");
+  assert.equal(summary.contractLabel, "Contract chrome.discord.message.v1");
   assert.equal(summary.captureLabel, "No physical capture");
   assert.equal(summary.blocking, false);
+});
+
+test("alert test evidence summary blocks missing event id and stale contract proof", () => {
+  const variants = [
+    {
+      name: "missing event id",
+      eventId: "",
+      contractVersion: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      contractLabel: "Event id missing",
+    },
+    {
+      name: "stale contract",
+      eventId: "silent-alert-old-contract",
+      contractVersion: "chrome.discord.message.v0",
+      contractLabel: "Contract chrome.discord.message.v0 rejected",
+    },
+  ];
+
+  for (const variant of variants) {
+    const decision = normalizeBridgeAlertDecisionEvent({
+      id: `audit-contract-${variant.name.replaceAll(" ", "-")}`,
+      category: "alert_ingestion",
+      action: "bridge_alert_decision",
+      summary: "Silent alert accepted and queued.",
+      severity: "info",
+      created_at: "2026-06-27T17:00:01.000Z",
+      details: {
+        contract_version: variant.contractVersion,
+        event_id: variant.eventId,
+        channel: { id: "silent-harness", name: "silent-harness" },
+        author: { id: "test-runner", name: "Test Runner" },
+        raw_text: "BTO SPY 500C 6/21 @ 1.25",
+        parsed: { ticker: "SPY" },
+        parser: { confidence: "high" },
+        source: {
+          key: "silent-harness",
+          name: "Silent Harness",
+          override_matched: true,
+          min_parser_confidence: "medium",
+          observed_parser_confidence: "high",
+          parser_confidence_allowed: true,
+          channel_url_allowed: true,
+          author_id_allowed: true,
+          metadata_policy_passed: true,
+        },
+        decision: {
+          status: "accepted",
+          alert_inserted: true,
+          alert_id: `alert-${variant.name.replaceAll(" ", "-")}`,
+          trade_requested: true,
+          trade_request_reason: "risk approved; order intent queued",
+          skip_reason: "",
+        },
+      },
+    });
+    const chain = buildAlertEvidenceChains({ signals: [], decisions: [decision] })[0];
+    const summary = buildAlertTestEvidenceSummary(chain);
+
+    assert.equal(summary.modeLabel, "Silent audit test", variant.name);
+    assert.equal(summary.gateLabel, "Blocks test", variant.name);
+    assert.equal(summary.contractLabel, variant.contractLabel, variant.name);
+    assert.equal(summary.queueLabel, "Order request queued", variant.name);
+    assert.equal(summary.auditLabel.includes("Audit audit-contract-"), true, variant.name);
+    assert.equal(summary.blocking, true, variant.name);
+  }
 });
 
 test("alert test evidence summary blocks physical observation without audit decision", () => {
@@ -605,6 +672,7 @@ test("alert test evidence summary blocks physical observation without audit deci
 
   assert.equal(summary.modeLabel, "Physical observation missing audit");
   assert.equal(summary.gateLabel, "Blocks test");
+  assert.equal(summary.contractLabel, "Contract proof requires audit");
   assert.equal(summary.sourceLabel, "Source proof missing");
   assert.equal(summary.queueLabel, "No order queued");
   assert.equal(summary.auditLabel, "Audit proof missing");
@@ -616,6 +684,7 @@ test("alert test evidence summary fails closed when no chain exists", () => {
 
   assert.equal(summary.modeLabel, "Alert test proof missing");
   assert.equal(summary.gateLabel, "Blocks test");
+  assert.equal(summary.contractLabel, "Contract proof missing");
   assert.equal(summary.parserLabel, "Parser proof missing");
   assert.equal(summary.sourceLabel, "Source proof missing");
   assert.equal(summary.queueLabel, "Queue proof missing");

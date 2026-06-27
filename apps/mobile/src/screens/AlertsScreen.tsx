@@ -177,6 +177,7 @@ export function AlertsScreen() {
                 <StatusPill label={alertTest.gateLabel} tone={alertTestTone(alertTest.blocking)} />
               </View>
               <Text style={styles.detail}>{alertTest.modeLabel}</Text>
+              <Text style={styles.detail}>{alertTest.contractLabel}</Text>
               <Text style={styles.detail}>{alertTest.parserLabel}</Text>
               <Text style={styles.detail}>{alertTest.sourceLabel}</Text>
               <Text style={styles.detail}>{alertTest.queueLabel}</Text>

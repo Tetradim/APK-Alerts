@@ -1,4 +1,9 @@
-import { normalizeBridgeHealthPayload, type AlertEvidenceChain, type ReconciliationRow } from "@apk-alerts/contracts";
+import {
+  CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+  normalizeBridgeHealthPayload,
+  type AlertEvidenceChain,
+  type ReconciliationRow,
+} from "@apk-alerts/contracts";
 import {
   fetchRemoteAlertEvidence,
   type RemoteAlertEvidenceResult,
@@ -77,6 +82,7 @@ export interface QueuePlaceEvidenceSummary {
 export interface AlertTestEvidenceSummary {
   modeLabel: string;
   gateLabel: string;
+  contractLabel: string;
   parserLabel: string;
   sourceLabel: string;
   queueLabel: string;
@@ -170,6 +176,7 @@ export function buildAlertTestEvidenceSummary(chain: AlertEvidenceChain | null |
     return {
       modeLabel: "Alert test proof missing",
       gateLabel: "Blocks test",
+      contractLabel: "Contract proof missing",
       parserLabel: "Parser proof missing",
       sourceLabel: "Source proof missing",
       queueLabel: "Queue proof missing",
@@ -181,19 +188,55 @@ export function buildAlertTestEvidenceSummary(chain: AlertEvidenceChain | null |
 
   const source = buildSourcePolicySummary(chain);
   const queue = buildQueuePlaceEvidenceSummary(chain);
+  const contract = buildAlertContractProofSummary(chain);
   const hasParserProof = chain.parserConfidence !== "none";
   const hasAuditProof = Boolean(chain.decision?.auditEventId);
-  const clear = hasParserProof && !source.blocking && !queue.blocking && hasAuditProof;
+  const clear = contract.passed && hasParserProof && !source.blocking && !queue.blocking && hasAuditProof;
 
   return {
     modeLabel: formatAlertTestModeLabel(Boolean(chain.signal), Boolean(chain.decision)),
     gateLabel: clear ? "Test proof clear" : "Blocks test",
+    contractLabel: contract.label,
     parserLabel: hasParserProof ? `Parser proof ${chain.parserConfidence}` : "Parser proof missing",
     sourceLabel: source.statusLabel,
     queueLabel: formatAlertTestQueueLabel(queue),
     auditLabel: chain.decision?.auditEventId ? `Audit ${chain.decision.auditEventId}` : "Audit proof missing",
     captureLabel: formatAlertTestCaptureLabel(chain),
     blocking: !clear,
+  };
+}
+
+function buildAlertContractProofSummary(chain: AlertEvidenceChain): { passed: boolean; label: string } {
+  const decision = chain.decision;
+  if (!decision) {
+    return { passed: false, label: "Contract proof requires audit" };
+  }
+  if (!decision.eventId) {
+    return { passed: false, label: "Event id missing" };
+  }
+  if (decision.contractVersion !== CHROME_DISCORD_MESSAGE_CONTRACT_VERSION) {
+    return {
+      passed: false,
+      label: `Contract ${decision.contractVersion || "missing"} rejected`,
+    };
+  }
+  if (chain.signal) {
+    if (!chain.signal.eventId) {
+      return { passed: false, label: "Signal event id missing" };
+    }
+    if (chain.signal.eventId !== decision.eventId) {
+      return { passed: false, label: "Signal/audit event mismatch" };
+    }
+    if (chain.signal.contractVersion !== CHROME_DISCORD_MESSAGE_CONTRACT_VERSION) {
+      return {
+        passed: false,
+        label: `Signal contract ${chain.signal.contractVersion || "missing"} rejected`,
+      };
+    }
+  }
+  return {
+    passed: true,
+    label: `Contract ${CHROME_DISCORD_MESSAGE_CONTRACT_VERSION}`,
   };
 }
 
