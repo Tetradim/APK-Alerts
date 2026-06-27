@@ -1,29 +1,31 @@
 export type RemoteEngineHealth = "healthy" | "degraded" | "offline" | "unknown";
 
 export interface NormalizedRemoteHealth {
-  status: RemoteEngineHealth;
+  status: Exclude<RemoteEngineHealth, "unknown">;
   discordConnected: boolean;
   brokerConnected: boolean;
 }
 
 export interface NormalizedRemoteStatus {
-  activeBroker: string | null;
+  activeBroker: string;
   autoTradingEnabled: boolean;
   simulationMode: boolean;
   shutdownTriggered: boolean;
   alertsProcessed: number;
-  lastAlertTime: string | null;
+  lastAlertTime: string;
 }
 
 export interface RemoteEngineHealthSnapshot {
   engineHealth: RemoteEngineHealth;
   executionReady: boolean;
-  activeBroker: string | null;
+  discordConnected: boolean;
+  brokerConnected: boolean;
+  activeBroker: string;
   autoTradingEnabled: boolean;
   simulationMode: boolean;
   shutdownTriggered: boolean;
   alertsProcessed: number;
-  lastAlertTime: string | null;
+  lastAlertTime: string;
   checkedAt: string;
 }
 
@@ -41,12 +43,12 @@ function normalizeStrictBoolean(value: unknown): boolean {
   return value === true;
 }
 
-function normalizeOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
+function normalizeString(value: unknown, defaultValue: string): string {
+  return typeof value === "string" && value.length > 0 ? value : defaultValue;
 }
 
-function normalizeNonNegativeInteger(value: unknown): number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+function normalizeNonNegativeNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
 }
 
 export function normalizeRemoteHealthPayload(payload: unknown): NormalizedRemoteHealth {
@@ -60,8 +62,12 @@ export function normalizeRemoteHealthPayload(payload: unknown): NormalizedRemote
 
   const discordConnected = normalizeStrictBoolean(payload.discord_connected);
   const brokerConnected = normalizeStrictBoolean(payload.broker_connected);
-  const status =
-    payload.status === "healthy" && discordConnected && brokerConnected ? "healthy" : "degraded";
+  const status: Exclude<RemoteEngineHealth, "unknown"> =
+    payload.status === "healthy" && discordConnected && brokerConnected
+      ? "healthy"
+      : payload.status === "degraded" || discordConnected || brokerConnected
+        ? "degraded"
+        : "offline";
 
   return {
     status,
@@ -74,12 +80,12 @@ export function normalizeRemoteStatusPayload(payload: unknown): NormalizedRemote
   const input = isRecord(payload) ? payload : {};
 
   return {
-    activeBroker: normalizeOptionalString(input.active_broker),
+    activeBroker: normalizeString(input.active_broker, "unknown"),
     autoTradingEnabled: normalizeStrictBoolean(input.auto_trading_enabled),
-    simulationMode: normalizeStrictBoolean(input.simulation_mode),
+    simulationMode: input.simulation_mode === false ? false : true,
     shutdownTriggered: normalizeStrictBoolean(input.shutdown_triggered),
-    alertsProcessed: normalizeNonNegativeInteger(input.alerts_processed),
-    lastAlertTime: normalizeOptionalString(input.last_alert_time),
+    alertsProcessed: normalizeNonNegativeNumber(input.alerts_processed),
+    lastAlertTime: normalizeString(input.last_alert_time, ""),
   };
 }
 
@@ -88,14 +94,14 @@ export function buildRemoteEngineHealthSnapshot(
 ): RemoteEngineHealthSnapshot {
   const executionReady =
     input.health.status === "healthy" &&
-    input.status.activeBroker !== null &&
     input.status.autoTradingEnabled &&
-    !input.status.simulationMode &&
     !input.status.shutdownTriggered;
 
   return {
     engineHealth: executionReady ? "healthy" : input.health.status,
     executionReady,
+    discordConnected: input.health.discordConnected,
+    brokerConnected: input.health.brokerConnected,
     activeBroker: input.status.activeBroker,
     autoTradingEnabled: input.status.autoTradingEnabled,
     simulationMode: input.status.simulationMode,

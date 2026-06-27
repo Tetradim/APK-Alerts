@@ -31,6 +31,9 @@ test("remote health degrades unless status and required booleans are healthy", (
   );
   assert.equal(normalizeRemoteHealthPayload(null).status, "offline");
   assert.equal(normalizeRemoteHealthPayload("bad").status, "offline");
+  assert.equal(normalizeRemoteHealthPayload({}).status, "offline");
+  assert.equal(normalizeRemoteHealthPayload({ status: "bad" }).status, "offline");
+  assert.equal(normalizeRemoteHealthPayload({ status: "offline" }).status, "offline");
 });
 
 test("remote status normalizes runtime fields without coercing malformed booleans", () => {
@@ -51,6 +54,17 @@ test("remote status normalizes runtime fields without coercing malformed boolean
   assert.equal(status.lastAlertTime, "2026-06-27T15:00:00Z");
 });
 
+test("remote status fails closed when payload is missing", () => {
+  assert.deepEqual(normalizeRemoteStatusPayload(null), {
+    activeBroker: "unknown",
+    autoTradingEnabled: false,
+    simulationMode: true,
+    shutdownTriggered: false,
+    alertsProcessed: 0,
+    lastAlertTime: "",
+  });
+});
+
 test("remote engine snapshot fails closed when health is degraded or malformed", () => {
   const snapshot = buildRemoteEngineHealthSnapshot({
     health: { status: "degraded", discordConnected: true, brokerConnected: false },
@@ -62,6 +76,8 @@ test("remote engine snapshot fails closed when health is degraded or malformed",
   assert.equal(snapshot.executionReady, false);
   assert.equal(snapshot.activeBroker, "ibkr");
   assert.equal(snapshot.checkedAt, "2026-06-27T15:00:00Z");
+  assert.equal(snapshot.discordConnected, true);
+  assert.equal(snapshot.brokerConnected, false);
 });
 
 test("remote engine snapshot is healthy only when health, status, and runtime are ready", () => {
@@ -74,9 +90,9 @@ test("remote engine snapshot is healthy only when health, status, and runtime ar
     status: normalizeRemoteStatusPayload({
       active_broker: "ibkr",
       auto_trading_enabled: true,
-      simulation_mode: false,
+      simulation_mode: true,
       shutdown_triggered: false,
-      alerts_processed: 3,
+      alerts_processed: 3.8,
     }),
     checkedAt: "2026-06-27T15:00:00Z",
   });
@@ -84,4 +100,6 @@ test("remote engine snapshot is healthy only when health, status, and runtime ar
   assert.equal(snapshot.engineHealth, "healthy");
   assert.equal(snapshot.executionReady, true);
   assert.equal(snapshot.alertsProcessed, 3);
+  assert.equal(snapshot.discordConnected, true);
+  assert.equal(snapshot.brokerConnected, true);
 });
