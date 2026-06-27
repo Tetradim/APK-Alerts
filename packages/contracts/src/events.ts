@@ -118,20 +118,23 @@ export interface TradingEventPayloadByType {
 
 export type TradingEventPayload<TType extends TradingEventType> = TradingEventPayloadByType[TType];
 
-export interface CreateEventInput<TType extends TradingEventType> {
-  id: string;
-  type: TType;
-  sourceEngineId: EngineId;
-  observedAt: string;
-  sequence: number;
-  previousEventId?: string | null;
-  idempotencyKey?: string | null;
-  payload: TradingEventPayloadByType[TType];
-}
+export type CreateEventInput<TType extends TradingEventType = TradingEventType> =
+  TType extends TradingEventType
+    ? {
+        id: string;
+        type: TType;
+        sourceEngineId: EngineId;
+        observedAt: string;
+        sequence: number;
+        previousEventId?: string | null;
+        idempotencyKey?: string | null;
+        payload: TradingEventPayloadByType[TType];
+      }
+    : never;
 
-export function createEvent<TType extends TradingEventType>(
-  input: CreateEventInput<TType>,
-): BaseEvent<TType, TradingEventPayloadByType[TType]> {
+export function createEvent<TInput extends CreateEventInput>(
+  input: TInput,
+): BaseEvent<TInput["type"], TInput["payload"]> {
   return {
     id: input.id,
     type: input.type,

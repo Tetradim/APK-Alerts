@@ -6,6 +6,7 @@ import {
   canEngineExecute,
   createEvent,
   reduceLeaseEvent,
+  type TradingEventType,
 } from "./index.js";
 
 createEvent({
@@ -17,6 +18,20 @@ createEvent({
   // @ts-expect-error Known trading event types must require their contract payloads.
   payload: { unexpected: true },
 });
+
+function makeInvalidBroadEvent(type: TradingEventType) {
+  // @ts-expect-error Broad event type must not decouple type from payload.
+  return createEvent({
+    id: "event-invalid-broad-payload",
+    type,
+    sourceEngineId: "phone:pixel-1",
+    observedAt: "2026-06-27T05:00:00.000Z",
+    sequence: 1,
+    payload: { unexpected: true },
+  });
+}
+
+void makeInvalidBroadEvent;
 
 test("phone engine can execute only while it holds an active lease", () => {
   const leaseEvent = createEvent({
