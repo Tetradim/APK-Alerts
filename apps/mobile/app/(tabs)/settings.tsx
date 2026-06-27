@@ -1,10 +1,3 @@
-import { EmptyStateScreen } from "@/screens/EmptyStateScreen";
+import { SettingsScreen } from "@/screens/SettingsScreen";
 
-export default function SettingsRoute() {
-  return (
-    <EmptyStateScreen
-      title="Settings"
-      description="Configure real engine pairing, failover notifications, transport preference, Discord, broker, and risk controls."
-    />
-  );
-}
+export default SettingsScreen;
