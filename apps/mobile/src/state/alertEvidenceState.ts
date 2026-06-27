@@ -213,7 +213,25 @@ function buildAlertParserProofSummary(chain: AlertEvidenceChain): { passed: bool
   if (!chain.decision?.parsed || (chain.signal && !chain.signal.parsed)) {
     return { passed: false, label: "Parsed payload missing" };
   }
+  if (chain.signal && canonicalJson(chain.signal.parsed) !== canonicalJson(chain.decision.parsed)) {
+    return { passed: false, label: "Signal/audit parsed payload mismatch" };
+  }
   return { passed: true, label: `Parser proof ${chain.parserConfidence}` };
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+      .join(",")}}`;
+  }
+  const serialized = JSON.stringify(value);
+  return serialized === undefined ? "null" : serialized;
 }
 
 function buildAlertContractProofSummary(chain: AlertEvidenceChain): { passed: boolean; label: string } {
