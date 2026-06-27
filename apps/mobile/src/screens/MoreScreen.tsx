@@ -4,6 +4,7 @@ import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import {
+  buildLiveArmChecklistSummary,
   buildLiveReadinessSummary,
   buildReplayAcceptanceEvidenceSummary,
   useLiveReadinessState,
@@ -20,12 +21,17 @@ function readinessTone(label: string): "good" | "warn" | "bad" | "neutral" {
   return "bad";
 }
 
+function checklistTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
+}
+
 export function MoreScreen() {
   const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
   const snapshot = useLiveReadinessState((state) => state.snapshot);
   const updateConnectionDraft = useLiveReadinessState((state) => state.updateConnectionDraft);
   const checkReadiness = useLiveReadinessState((state) => state.checkReadiness);
   const summary = buildLiveReadinessSummary(snapshot);
+  const liveChecklist = buildLiveArmChecklistSummary(snapshot);
   const replayEvidence = buildReplayAcceptanceEvidenceSummary(snapshot);
   const readiness = snapshot.remote.readiness;
 
@@ -94,6 +100,31 @@ export function MoreScreen() {
       <View style={styles.panel}>
         <View style={styles.panelHeader}>
           <View style={styles.headerCopy}>
+            <Text style={styles.label}>Live arm checklist</Text>
+            <Text style={styles.panelTitle}>{liveChecklist.readyCountLabel}</Text>
+          </View>
+          <StatusPill label={liveChecklist.gateLabel} tone={checklistTone(liveChecklist.blocking)} />
+        </View>
+        <Text style={styles.detail}>{liveChecklist.blockingCountLabel}</Text>
+        {liveChecklist.items.map((item) => (
+          <View key={item.key} style={styles.checklistRow}>
+            <Text style={styles.label}>{item.label}</Text>
+            <Text
+              style={[
+                styles.checklistStatus,
+                item.blocking ? styles.checklistStatusBlocking : styles.checklistStatusClear,
+              ]}
+            >
+              {item.statusLabel}
+            </Text>
+            <Text style={styles.detail}>{item.detailLabel}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
             <Text style={styles.label}>Replay acceptance</Text>
             <Text style={styles.panelTitle}>{replayEvidence.statusLabel}</Text>
           </View>
@@ -132,6 +163,15 @@ const styles = StyleSheet.create({
   tileRow: { flexDirection: "row", gap: 10 },
   value: { color: "#f8fafc", fontSize: 15, fontWeight: "900", lineHeight: 21, marginTop: 4 },
   detail: { color: "#cbd5e1", fontSize: 13, lineHeight: 19 },
+  checklistRow: {
+    borderTopColor: "#1e293b",
+    borderTopWidth: 1,
+    gap: 4,
+    paddingTop: 10,
+  },
+  checklistStatus: { fontSize: 14, fontWeight: "900", lineHeight: 19 },
+  checklistStatusBlocking: { color: "#fca5a5" },
+  checklistStatusClear: { color: "#86efac" },
   error: { color: "#fca5a5", fontSize: 13, fontWeight: "800" },
   button: {
     alignItems: "center",

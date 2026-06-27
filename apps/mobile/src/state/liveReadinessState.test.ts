@@ -3,6 +3,7 @@ import test from "node:test";
 import { normalizeLiveReadinessPayload } from "@apk-alerts/contracts";
 import {
   buildExitProtectionEvidenceSummary,
+  buildLiveArmChecklistSummary,
   buildReplayAcceptanceEvidenceSummary,
   buildLiveReadinessSummary,
   createLiveReadinessStore,
@@ -273,6 +274,120 @@ test("exit protection evidence treats default empty readiness as blocking", () =
   assert.equal(summary.unprotectedPositionsLabel, "Unprotected positions: none");
   assert.equal(summary.metadataOnlyPositionsLabel, "Metadata-only positions: none");
   assert.equal(summary.blocking, true);
+});
+
+test("live arm checklist clears only when every endpoint and runtime gate passes", () => {
+  const summary = buildLiveArmChecklistSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: readinessSnapshot(),
+  });
+
+  assert.equal(summary.gateLabel, "Live checklist clear");
+  assert.equal(summary.readyCountLabel, "14/14 gate(s) clear");
+  assert.equal(summary.blockingCountLabel, "No live-arm blockers");
+  assert.equal(summary.blocking, false);
+  assert.equal(summary.items.length, 14);
+  assert.equal(summary.items.find((item) => item.key === "endpoint")?.statusLabel, "Endpoint verdict ready");
+  assert.equal(summary.items.find((item) => item.key === "credential")?.statusLabel, "Credential key valid");
+  assert.equal(summary.items.find((item) => item.key === "broker")?.statusLabel, "Broker ready");
+  assert.equal(summary.items.find((item) => item.key === "runtime")?.statusLabel, "Runtime armed");
+});
+
+test("live arm checklist blocks endpoint-ready payload until runtime arming is present", () => {
+  const unarmedPayload = {
+    ...readyPayload,
+    checks: {
+      ...readyPayload.checks,
+      runtime: {
+        ...readyPayload.checks.runtime,
+        live_trading_armed: false,
+      },
+    },
+  };
+  const summary = buildLiveArmChecklistSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: {
+      checkedAt: "2026-06-27T17:25:00.000Z",
+      readiness: normalizeLiveReadinessPayload(unarmedPayload),
+      liveMoneyReady: false,
+    },
+  });
+  const endpoint = summary.items.find((item) => item.key === "endpoint");
+  const runtime = summary.items.find((item) => item.key === "runtime");
+
+  assert.equal(summary.gateLabel, "Live checklist blocked");
+  assert.equal(summary.readyCountLabel, "13/14 gate(s) clear");
+  assert.equal(summary.blockingCountLabel, "1 live-arm blocker(s)");
+  assert.equal(summary.blocking, true);
+  assert.equal(endpoint?.blocking, false);
+  assert.equal(endpoint?.statusLabel, "Endpoint verdict ready");
+  assert.equal(runtime?.blocking, true);
+  assert.equal(runtime?.statusLabel, "Runtime not armed");
+  assert.equal(runtime?.detailLabel, "Not armed");
+});
+
+test("live arm checklist fails closed without endpoint evidence", () => {
+  const summary = buildLiveArmChecklistSummary(getDefaultLiveReadinessSnapshot());
+  const endpoint = summary.items.find((item) => item.key === "endpoint");
+
+  assert.equal(summary.gateLabel, "Live checklist blocked");
+  assert.equal(summary.readyCountLabel, "0/14 gate(s) clear");
+  assert.equal(summary.blockingCountLabel, "14 live-arm blocker(s)");
+  assert.equal(summary.blocking, true);
+  assert.equal(endpoint?.statusLabel, "Endpoint evidence missing");
+  assert.equal(endpoint?.detailLabel, "Run live-readiness check before arming.");
+});
+
+test("live arm checklist exposes broker source credential and ingestion blockers", () => {
+  const blockedPayload = {
+    ...readyPayload,
+    ready_for_live: false,
+    blocking_issues: [
+      { code: "credential_key_invalid", message: "Credential key is not valid." },
+      { code: "active_broker_not_connected", message: "Active broker is offline." },
+    ],
+    blocking_codes: ["credential_key_invalid", "active_broker_not_connected"],
+    checks: {
+      ...readyPayload.checks,
+      credential_key: { configured: true, valid: false },
+      broker: {
+        ...readyPayload.checks.broker,
+        configured: true,
+        connected: false,
+        missing_required_fields: ["api_secret"],
+      },
+      source_policy: {
+        ...readyPayload.checks.source_policy,
+        valid: false,
+        auto_live_sources: 0,
+        error: "No strict source policy allows live execution.",
+      },
+      signal_ingestion: {
+        ...readyPayload.checks.signal_ingestion,
+        discord_connected: false,
+        chrome_bridge_healthy: false,
+      },
+    },
+  };
+  const summary = buildLiveArmChecklistSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: {
+      checkedAt: "2026-06-27T17:25:00.000Z",
+      readiness: normalizeLiveReadinessPayload(blockedPayload),
+      liveMoneyReady: false,
+    },
+  });
+
+  assert.equal(summary.gateLabel, "Live checklist blocked");
+  assert.equal(summary.items.find((item) => item.key === "credential")?.statusLabel, "Credential key invalid");
+  assert.equal(summary.items.find((item) => item.key === "broker")?.statusLabel, "Broker blocked");
+  assert.equal(summary.items.find((item) => item.key === "broker")?.detailLabel, "alpaca offline; missing api_secret");
+  assert.equal(summary.items.find((item) => item.key === "source")?.statusLabel, "Source policy blocked");
+  assert.equal(
+    summary.items.find((item) => item.key === "source")?.detailLabel,
+    "No strict source policy allows live execution.",
+  );
+  assert.equal(summary.items.find((item) => item.key === "ingestion")?.statusLabel, "Live ingestion blocked");
 });
 
 test("live-readiness store refreshes and clears stale readiness on connection edit", async () => {

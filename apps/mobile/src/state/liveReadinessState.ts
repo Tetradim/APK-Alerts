@@ -66,6 +66,22 @@ export interface ExitProtectionEvidenceSummary {
   blocking: boolean;
 }
 
+export interface LiveArmChecklistItem {
+  key: string;
+  label: string;
+  statusLabel: string;
+  detailLabel: string;
+  blocking: boolean;
+}
+
+export interface LiveArmChecklistSummary {
+  gateLabel: string;
+  readyCountLabel: string;
+  blockingCountLabel: string;
+  blocking: boolean;
+  items: LiveArmChecklistItem[];
+}
+
 export interface LiveReadinessState {
   snapshot: LiveReadinessSnapshot;
   activeRequestId: number;
@@ -194,6 +210,201 @@ export function buildExitProtectionEvidenceSummary(
       exits.metadataOnlyOpenPositionCount,
     ),
     blocking: !protectedByOco,
+  };
+}
+
+export function buildLiveArmChecklistSummary(snapshot: LiveReadinessSnapshot): LiveArmChecklistSummary {
+  const readiness = snapshot.remote.readiness;
+  const checks = readiness.checks;
+  const missingEndpointEvidence = !snapshot.remote.checkedAt;
+  const replay = buildReplayAcceptanceEvidenceSummary(snapshot);
+  const exits = buildExitProtectionEvidenceSummary(snapshot);
+  const brokerCapabilities = checks.broker.capabilities;
+  const brokerReady =
+    checks.broker.configured &&
+    checks.broker.connected &&
+    brokerCapabilities.supportsLiveTrading &&
+    brokerCapabilities.supportsOptions &&
+    brokerCapabilities.supportsOrderStatus &&
+    brokerCapabilities.supportsCancelOrder &&
+    checks.broker.missingRequiredFields.length === 0;
+  const sourceReady = checks.sourcePolicy.valid && checks.sourcePolicy.autoLiveSources > 0;
+  const ingestionReady = checks.signalIngestion.discordConnected || checks.signalIngestion.chromeBridgeHealthy;
+  const tradingReady =
+    checks.trading.autoTradingEnabled &&
+    !checks.trading.simulationMode &&
+    checks.trading.maxPositionSizeValid;
+  const runtimeReady = !checks.runtime.shutdownTriggered && checks.runtime.liveTradingArmed;
+  const endpointReady =
+    readiness.readyForLive &&
+    readiness.blockingCodes.length === 0 &&
+    !readiness.blockingCodes.includes("readiness_payload_invalid");
+
+  const items: LiveArmChecklistItem[] = [
+    checklistItem({
+      key: "endpoint",
+      label: "Endpoint verdict",
+      passed: endpointReady,
+      statusLabel: missingEndpointEvidence
+        ? "Endpoint evidence missing"
+        : endpointReady
+          ? "Endpoint verdict ready"
+          : "Endpoint verdict blocked",
+      detailLabel: formatEndpointChecklistDetail(snapshot),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "role",
+      label: "Execution role",
+      passed: checks.role.valid && checks.role.liveExecutionAllowed,
+      statusLabel: checks.role.valid && checks.role.liveExecutionAllowed
+        ? "Live execution role allowed"
+        : "Execution role blocked",
+      detailLabel: checks.role.activeRole || "No active role reported",
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "api_auth",
+      label: "API auth",
+      passed: checks.apiAuth.configured || checks.apiAuth.authlessDesktopMode,
+      statusLabel: checks.apiAuth.configured || checks.apiAuth.authlessDesktopMode
+        ? "API auth available"
+        : "API auth missing",
+      detailLabel: formatApiAuthChecklistDetail(
+        checks.apiAuth.configured,
+        checks.apiAuth.authlessDesktopMode,
+      ),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "credential",
+      label: "Credential key",
+      passed: checks.credentialKey.configured && checks.credentialKey.valid,
+      statusLabel: checks.credentialKey.configured && checks.credentialKey.valid
+        ? "Credential key valid"
+        : "Credential key invalid",
+      detailLabel: formatCredentialChecklistDetail(checks.credentialKey.configured, checks.credentialKey.valid),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "broker",
+      label: "Broker",
+      passed: brokerReady,
+      statusLabel: brokerReady ? "Broker ready" : "Broker blocked",
+      detailLabel: formatBrokerChecklistDetail(
+        checks.broker.activeBroker,
+        checks.broker.connected,
+        checks.broker.missingRequiredFields,
+        brokerCapabilities,
+      ),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "source",
+      label: "Source policy",
+      passed: sourceReady,
+      statusLabel: sourceReady ? "Source policy clear" : "Source policy blocked",
+      detailLabel: checks.sourcePolicy.error ||
+        `${checks.sourcePolicy.autoLiveSources} auto-live, ${checks.sourcePolicy.enabledSources} enabled`,
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "ingestion",
+      label: "Live ingestion",
+      passed: ingestionReady,
+      statusLabel: ingestionReady ? "Live ingestion healthy" : "Live ingestion blocked",
+      detailLabel: formatIngestionChecklistDetail(
+        checks.signalIngestion.chromeBridgeHealthy,
+        checks.signalIngestion.discordConnected,
+        checks.signalIngestion.discordConfigured,
+        checks.signalIngestion.discordChannelCount,
+      ),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "trading",
+      label: "Trading controls",
+      passed: tradingReady,
+      statusLabel: tradingReady ? "Trading controls clear" : "Trading controls blocked",
+      detailLabel: formatTradingChecklistDetail(
+        checks.trading.autoTradingEnabled,
+        checks.trading.simulationMode,
+        checks.trading.maxPositionSize,
+        checks.trading.maxPositionSizeValid,
+      ),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "replay",
+      label: "Replay acceptance",
+      passed: !replay.blocking,
+      statusLabel: replay.statusLabel,
+      detailLabel: replay.detailLabel,
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "reconciliation",
+      label: "Broker reconciliation",
+      passed: checks.reconciliation.unresolvedCount === 0,
+      statusLabel: checks.reconciliation.unresolvedCount === 0 ? "Reconciliation clear" : "Reconciliation blocked",
+      detailLabel: formatReasonListLabel(
+        checks.reconciliation.unresolvedReasons,
+        `${checks.reconciliation.unresolvedCount} unresolved item(s)`,
+      ),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "alert_chains",
+      label: "Alert chains",
+      passed: checks.alertChains.liveBlockingAttentionCount === 0,
+      statusLabel: checks.alertChains.liveBlockingAttentionCount === 0 ? "Alert chains clear" : "Alert chains blocked",
+      detailLabel: formatReasonListLabel(
+        checks.alertChains.liveBlockingAttentionReasons,
+        `${checks.alertChains.liveBlockingAttentionCount} live-blocking alert chain(s)`,
+      ),
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "exits",
+      label: "OCO exits",
+      passed: !exits.blocking,
+      statusLabel: exits.statusLabel,
+      detailLabel: exits.capabilityLabel,
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "runtime",
+      label: "Runtime arming",
+      passed: runtimeReady,
+      statusLabel: runtimeReady ? "Runtime armed" : "Runtime not armed",
+      detailLabel: checks.runtime.shutdownTriggered
+        ? "Shutdown triggered"
+        : checks.runtime.liveTradingArmed
+          ? `Armed until ${checks.runtime.liveTradingArmedUntil || "unknown"}`
+          : "Not armed",
+      missingEndpointEvidence,
+    }),
+    checklistItem({
+      key: "readiness_gates",
+      label: "Readiness gates",
+      passed: checks.readinessGates.missingGateKeys.length === 0,
+      statusLabel: checks.readinessGates.missingGateKeys.length === 0 ? "All readiness gates present" : "Readiness gates missing",
+      detailLabel: checks.readinessGates.missingGateKeys.length === 0
+        ? "No missing gate keys"
+        : `Missing ${checks.readinessGates.missingGateKeys.join(", ")}`,
+      missingEndpointEvidence,
+    }),
+  ];
+  const readyCount = items.filter((item) => !item.blocking).length;
+  const blockingCount = items.length - readyCount;
+  const clear = blockingCount === 0 && snapshot.remote.liveMoneyReady;
+
+  return {
+    gateLabel: clear ? "Live checklist clear" : "Live checklist blocked",
+    readyCountLabel: `${readyCount}/${items.length} gate(s) clear`,
+    blockingCountLabel: blockingCount === 0 ? "No live-arm blockers" : `${blockingCount} live-arm blocker(s)`,
+    blocking: !clear,
+    items,
   };
 }
 
@@ -347,4 +558,110 @@ function formatPositionEvidenceLabel(label: "Unprotected" | "Metadata-only", pos
     return `${label} positions: ${count} unlisted`;
   }
   return `${label} positions: none`;
+}
+
+function checklistItem(input: {
+  key: string;
+  label: string;
+  passed: boolean;
+  statusLabel: string;
+  detailLabel: string;
+  missingEndpointEvidence: boolean;
+}): LiveArmChecklistItem {
+  return {
+    key: input.key,
+    label: input.label,
+    statusLabel: input.statusLabel,
+    detailLabel: input.detailLabel,
+    blocking: input.missingEndpointEvidence || !input.passed,
+  };
+}
+
+function formatEndpointChecklistDetail(snapshot: LiveReadinessSnapshot): string {
+  if (!snapshot.remote.checkedAt) {
+    return "Run live-readiness check before arming.";
+  }
+  const readiness = snapshot.remote.readiness;
+  if (readiness.blockingCodes.length > 0) {
+    return `Blocking codes: ${readiness.blockingCodes.join(", ")}`;
+  }
+  return `Checked ${snapshot.remote.checkedAt}`;
+}
+
+function formatCredentialChecklistDetail(configured: boolean, valid: boolean): string {
+  if (configured && valid) {
+    return "Configured and valid";
+  }
+  if (configured) {
+    return "Configured but invalid";
+  }
+  return "Credential key missing";
+}
+
+function formatApiAuthChecklistDetail(configured: boolean, authlessDesktopMode: boolean): string {
+  if (authlessDesktopMode) {
+    return "Authless desktop mode";
+  }
+  return configured ? "API auth configured" : "No API auth configured";
+}
+
+function formatBrokerChecklistDetail(
+  activeBroker: string,
+  connected: boolean,
+  missingRequiredFields: string[],
+  capabilities: {
+    supportsLiveTrading: boolean;
+    supportsOptions: boolean;
+    supportsOrderStatus: boolean;
+    supportsCancelOrder: boolean;
+  },
+): string {
+  const details = [`${activeBroker} ${connected ? "connected" : "offline"}`];
+  if (missingRequiredFields.length > 0) {
+    details.push(`missing ${missingRequiredFields.join(", ")}`);
+  }
+  const missingCapabilities = [
+    capabilities.supportsLiveTrading ? "" : "live trading",
+    capabilities.supportsOptions ? "" : "options",
+    capabilities.supportsOrderStatus ? "" : "order status",
+    capabilities.supportsCancelOrder ? "" : "cancel order",
+  ].filter(Boolean);
+  if (missingCapabilities.length > 0) {
+    details.push(`missing ${missingCapabilities.join(", ")}`);
+  }
+  return details.join("; ");
+}
+
+function formatIngestionChecklistDetail(
+  chromeBridgeHealthy: boolean,
+  discordConnected: boolean,
+  discordConfigured: boolean,
+  discordChannelCount: number,
+): string {
+  const bridge = chromeBridgeHealthy ? "Chrome bridge healthy" : "Chrome bridge offline";
+  const discord = discordConnected
+    ? "Discord connected"
+    : discordConfigured
+      ? "Discord configured but offline"
+      : "Discord not configured";
+  return `${bridge}; ${discord}; ${discordChannelCount} channel(s)`;
+}
+
+function formatTradingChecklistDetail(
+  autoTradingEnabled: boolean,
+  simulationMode: boolean,
+  maxPositionSize: number | null,
+  maxPositionSizeValid: boolean,
+): string {
+  const mode = simulationMode ? "simulation mode" : "live mode";
+  const auto = autoTradingEnabled ? "auto trading enabled" : "auto trading disabled";
+  const size = maxPositionSizeValid ? `max position ${maxPositionSize ?? "not reported"}` : "max position invalid";
+  return `${auto}; ${mode}; ${size}`;
+}
+
+function formatReasonListLabel(reasons: string[], fallback: string): string {
+  if (reasons.length > 0) {
+    return reasons.join("; ");
+  }
+  return fallback;
 }
