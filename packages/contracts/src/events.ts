@@ -12,6 +12,8 @@ export type TradingEventType =
   | "lease.relinquished.v1"
   | "lease.expired.v1"
   | "discord.alert.observed.v1"
+  | "alert.peer.challenge.v1"
+  | "alert.peer.response.v1"
   | "alert.parse.decision.v1"
   | "order.intent.v1"
   | "broker.order.update.v1"
@@ -58,6 +60,44 @@ export interface DiscordAlertObservedPayload {
   normalizedTextSha256: string;
 }
 
+export interface AlertPeerChallengePayload {
+  challengeId: string;
+  targetEngineId: EngineId;
+  leaseId: string;
+  remoteObservedAt: string;
+  discordMessageId: string;
+  channelId: string;
+  authorId: string | null;
+  messageUrl: string;
+  normalizedTextSha256: string;
+  sourceKey: string;
+}
+
+export type PeerAlertDecisionStatus = "accepted" | "skipped" | "duplicate" | "unknown";
+
+export interface PeerAlertFingerprint {
+  eventId: string;
+  discordMessageId: string;
+  channelId: string;
+  authorId: string | null;
+  messageUrl: string;
+  normalizedTextSha256: string;
+  sourceKey: string;
+  parserConfidence: "none" | "low" | "medium" | "high";
+  decisionStatus: PeerAlertDecisionStatus;
+  queuedAlertId: string;
+}
+
+export interface AlertPeerResponsePayload {
+  challengeId: string;
+  leaseId: string;
+  responderEngineId: EngineId;
+  respondedAt: string;
+  phoneObservedAt: string;
+  phoneReceivedAt: string;
+  lastAlert: PeerAlertFingerprint | null;
+}
+
 export interface AlertParseDecisionPayload {
   discordMessageId: string;
   accepted: boolean;
@@ -85,6 +125,8 @@ export type LeaseEvent = BaseEvent<
   LeasePayload
 >;
 export type DiscordAlertObservedEvent = BaseEvent<"discord.alert.observed.v1", DiscordAlertObservedPayload>;
+export type AlertPeerChallengeEvent = BaseEvent<"alert.peer.challenge.v1", AlertPeerChallengePayload>;
+export type AlertPeerResponseEvent = BaseEvent<"alert.peer.response.v1", AlertPeerResponsePayload>;
 export type AlertParseDecisionEvent = BaseEvent<"alert.parse.decision.v1", AlertParseDecisionPayload>;
 export type OrderIntentEvent = BaseEvent<"order.intent.v1", OrderIntentPayload>;
 export type AnyTradingEvent =
@@ -92,6 +134,8 @@ export type AnyTradingEvent =
   | TransportHealthEvent
   | LeaseEvent
   | DiscordAlertObservedEvent
+  | AlertPeerChallengeEvent
+  | AlertPeerResponseEvent
   | AlertParseDecisionEvent
   | OrderIntentEvent
   | BaseEvent<"broker.order.update.v1", Record<string, unknown>>
@@ -108,6 +152,8 @@ export interface TradingEventPayloadByType {
   "lease.relinquished.v1": LeasePayload;
   "lease.expired.v1": LeasePayload;
   "discord.alert.observed.v1": DiscordAlertObservedPayload;
+  "alert.peer.challenge.v1": AlertPeerChallengePayload;
+  "alert.peer.response.v1": AlertPeerResponsePayload;
   "alert.parse.decision.v1": AlertParseDecisionPayload;
   "order.intent.v1": OrderIntentPayload;
   "broker.order.update.v1": Record<string, unknown>;
