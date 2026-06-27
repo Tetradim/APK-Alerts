@@ -6,6 +6,11 @@ import {
   normalizeFailoverSettings,
 } from "@apk-alerts/contracts";
 import { create } from "zustand";
+import {
+  loadFailoverSettings,
+  saveFailoverSettings,
+  type SecureSettingsStorage,
+} from "./secureSettingsPersistence";
 
 export interface MobileSettingsSnapshot {
   failoverSettings: FailoverSettings;
@@ -53,9 +58,11 @@ export function buildSettingsSummary(settings: FailoverSettings): SettingsSummar
 interface SettingsState {
   snapshot: MobileSettingsSnapshot;
   updateFailoverSettings: (patch: Partial<FailoverSettings>) => void;
+  hydrateFailoverSettings: (storage: SecureSettingsStorage) => Promise<void>;
+  persistFailoverSettings: (storage: SecureSettingsStorage) => Promise<void>;
 }
 
-export const useSettingsState = create<SettingsState>((set) => ({
+export const useSettingsState = create<SettingsState>((set, get) => ({
   snapshot: getDefaultMobileSettingsSnapshot(),
   updateFailoverSettings: (patch) =>
     set((state) => ({
@@ -63,4 +70,18 @@ export const useSettingsState = create<SettingsState>((set) => ({
         failoverSettings: createNextSettings(state.snapshot.failoverSettings, patch),
       },
     })),
+  hydrateFailoverSettings: async (storage) => {
+    const settings = await loadFailoverSettings(storage);
+    if (!settings) {
+      return;
+    }
+    set({
+      snapshot: {
+        failoverSettings: settings,
+      },
+    });
+  },
+  persistFailoverSettings: async (storage) => {
+    await saveFailoverSettings(storage, get().snapshot.failoverSettings);
+  },
 }));

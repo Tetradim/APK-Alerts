@@ -12,6 +12,11 @@ import {
 } from "@apk-alerts/sync-client";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
+import {
+  loadRemoteConnection,
+  saveRemoteConnection,
+  type SecureSettingsStorage,
+} from "./secureSettingsPersistence";
 
 export type RemoteTransport = "tailscale" | "same_wifi" | "cloud_relay" | "none";
 export type RemoteEngineChecker = (
@@ -50,6 +55,8 @@ export interface RemoteEngineState {
   activeRequestId: number;
   nextRequestId: number;
   updateConnectionDraft: (draft: RemoteConnectionDraft) => void;
+  hydrateConnection: (storage: SecureSettingsStorage) => Promise<void>;
+  persistConnection: (storage: SecureSettingsStorage) => Promise<void>;
   checkRemote: () => Promise<void>;
 }
 
@@ -203,6 +210,16 @@ export function createRemoteEngineStore(checker: RemoteEngineChecker = checkRemo
           lastError: "",
         },
       }));
+    },
+    hydrateConnection: async (storage) => {
+      const connection = await loadRemoteConnection(storage);
+      if (!connection) {
+        return;
+      }
+      get().updateConnectionDraft(connection);
+    },
+    persistConnection: async (storage) => {
+      await saveRemoteConnection(storage, get().snapshot.connection);
     },
     checkRemote: async () => {
       const connection = get().snapshot.connection;

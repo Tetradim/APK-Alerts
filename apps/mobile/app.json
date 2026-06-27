@@ -29,7 +29,10 @@
         {
           "backgroundColor": "#0f172a"
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

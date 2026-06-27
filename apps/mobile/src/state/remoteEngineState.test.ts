@@ -13,6 +13,27 @@ import {
   normalizeConnectionDraft,
   type RemoteEngineChecker,
 } from "./remoteEngineState.js";
+import {
+  REMOTE_CONNECTION_STORAGE_KEY,
+  type SecureSettingsStorage,
+} from "./secureSettingsPersistence.js";
+
+function memoryStorage(initial: Record<string, string> = {}): SecureSettingsStorage & {
+  values: Record<string, string>;
+} {
+  return {
+    values: { ...initial },
+    async getItemAsync(key) {
+      return this.values[key] ?? null;
+    },
+    async setItemAsync(key, value) {
+      this.values[key] = value;
+    },
+    async deleteItemAsync(key) {
+      delete this.values[key];
+    },
+  };
+}
 
 function healthyRemoteSnapshot(checkedAt: string, alertsProcessed: number) {
   return buildRemoteEngineHealthSnapshot({
@@ -43,7 +64,9 @@ function createDeferredCheck(snapshot = healthyRemoteSnapshot("2026-06-27T16:00:
   return {
     checker,
     resolve: () => {
-      assert.ok(resolveCheck);
+      if (!resolveCheck) {
+        throw new Error("Deferred check was not started.");
+      }
       resolveCheck();
     },
   };
@@ -234,4 +257,30 @@ test("remote store older concurrent check cannot clear newer check or overwrite 
   assert.equal(store.getState().snapshot.checking, false);
   assert.equal(store.getState().snapshot.remote.alertsProcessed, 2);
   assert.equal(store.getState().snapshot.remote.checkedAt, "2026-06-27T16:01:00Z");
+});
+
+test("remote store hydrates and persists connection through secure storage", async () => {
+  const storage = memoryStorage({
+    [REMOTE_CONNECTION_STORAGE_KEY]: JSON.stringify({
+      baseApiUrl: " http://100.90.10.11:8001/api ",
+      apiKey: " secret ",
+    }),
+  });
+  const store = createRemoteEngineStore();
+
+  await store.getState().hydrateConnection(storage);
+  assert.equal(store.getState().snapshot.connection.baseApiUrl, "http://100.90.10.11:8001/api");
+  assert.equal(store.getState().snapshot.connection.apiKey, "secret");
+  assert.equal(store.getState().snapshot.connection.transport, "tailscale");
+
+  store.getState().updateConnectionDraft({
+    baseApiUrl: "https://relay.example.com/api",
+    apiKey: "next",
+  });
+  await store.getState().persistConnection(storage);
+
+  assert.deepEqual(JSON.parse(storage.values[REMOTE_CONNECTION_STORAGE_KEY]), {
+    baseApiUrl: "https://relay.example.com/api",
+    apiKey: "next",
+  });
 });

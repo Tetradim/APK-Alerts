@@ -2,6 +2,10 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
+import {
+  buildPhoneEngineRuntimeSummary,
+  usePhoneEngineRuntimeState,
+} from "@/state/phoneEngineRuntimeState";
 import { buildRemoteEngineSummary, useRemoteEngineState } from "@/state/remoteEngineState";
 
 function healthTone(label: string): "good" | "warn" | "bad" | "neutral" {
@@ -24,7 +28,9 @@ export function EnginesScreen() {
   const snapshot = useRemoteEngineState((state) => state.snapshot);
   const updateConnectionDraft = useRemoteEngineState((state) => state.updateConnectionDraft);
   const checkRemote = useRemoteEngineState((state) => state.checkRemote);
+  const phoneRuntimeSnapshot = usePhoneEngineRuntimeState((state) => state.snapshot);
   const summary = buildRemoteEngineSummary(snapshot);
+  const phoneRuntime = buildPhoneEngineRuntimeSummary(phoneRuntimeSnapshot);
 
   return (
     <ScreenFrame title="Engines" eyebrow="APK-Alerts">
@@ -80,8 +86,8 @@ export function EnginesScreen() {
       <View style={styles.tileRow}>
         <MetricTile
           label="Phone"
-          value={summary.phoneHealthLabel}
-          detail="Foreground service will own lease when engine is running"
+          value={phoneRuntime.statusLabel}
+          detail={phoneRuntime.detailLabel}
         />
         <MetricTile label="Remote" value={summary.remoteHealthLabel} detail={summary.remoteDetailLabel} />
       </View>

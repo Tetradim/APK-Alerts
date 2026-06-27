@@ -46,11 +46,13 @@ export interface PeerAlertChallengeEndpointResponse {
 export interface PeerAlertChallengeEndpointRequest {
   method: string;
   path: string;
+  headers?: HeadersInit;
   body: unknown;
 }
 
 export interface PeerAlertChallengeEndpointConfig {
   phoneEngineId: EngineId;
+  apiKey?: string;
   getLastAlert: () => PeerAlertPhoneAlertSnapshot | null | Promise<PeerAlertPhoneAlertSnapshot | null>;
   now?: () => string;
   nextResponseEventId?: (challenge: AlertPeerChallengeEvent) => string;
@@ -72,6 +74,10 @@ export async function handlePeerAlertChallengeRequest(
 
   if (request.method.toUpperCase() !== "POST") {
     return errorResponse(405, checkedAt, "Peer alert endpoint requires POST.");
+  }
+
+  if (!isAuthorized(config.apiKey, request.headers)) {
+    return errorResponse(401, checkedAt, "Peer alert endpoint authentication failed.");
   }
 
   if (!isAlertPeerChallengeEvent(request.body)) {
@@ -130,6 +136,7 @@ export async function handlePeerAlertChallengeFetchRequest(
   const result = await handlePeerAlertChallengeRequest(config, {
     method: request.method,
     path: url.pathname,
+    headers: request.headers,
     body: await readJsonBody(request),
   });
 
@@ -168,6 +175,31 @@ async function readJsonBody(request: Request): Promise<unknown> {
   } catch {
     return null;
   }
+}
+
+function isAuthorized(expectedApiKey: string | undefined, headers: HeadersInit | undefined): boolean {
+  const expected = expectedApiKey?.trim();
+  if (!expected) {
+    return true;
+  }
+
+  return getHeaderValue(headers, "x-api-key") === expected;
+}
+
+function getHeaderValue(headers: HeadersInit | undefined, name: string): string {
+  if (!headers) {
+    return "";
+  }
+  if (headers instanceof Headers) {
+    return headers.get(name)?.trim() ?? "";
+  }
+  if (Array.isArray(headers)) {
+    const found = headers.find(([key]) => key.toLowerCase() === name);
+    return found?.[1].trim() ?? "";
+  }
+
+  const found = Object.entries(headers).find(([key]) => key.toLowerCase() === name);
+  return found?.[1]?.trim() ?? "";
 }
 
 function isAlertPeerChallengeEvent(input: unknown): input is AlertPeerChallengeEvent {

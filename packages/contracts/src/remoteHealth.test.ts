@@ -120,7 +120,7 @@ test("remote engine snapshot is healthy only when health, status, and runtime ar
     status: normalizeRemoteStatusPayload({
       active_broker: "ibkr",
       auto_trading_enabled: true,
-      simulation_mode: true,
+      simulation_mode: false,
       shutdown_triggered: false,
       alerts_processed: 3.8,
     }),
@@ -132,4 +132,25 @@ test("remote engine snapshot is healthy only when health, status, and runtime ar
   assert.equal(snapshot.alertsProcessed, 3);
   assert.equal(snapshot.discordConnected, true);
   assert.equal(snapshot.brokerConnected, true);
+});
+
+test("remote engine snapshot is not execution-ready while simulation mode is enabled", () => {
+  const snapshot = buildRemoteEngineHealthSnapshot({
+    health: normalizeRemoteHealthPayload({
+      status: "healthy",
+      discord_connected: true,
+      broker_connected: true,
+    }),
+    status: normalizeRemoteStatusPayload({
+      active_broker: "ibkr",
+      auto_trading_enabled: true,
+      simulation_mode: true,
+      shutdown_triggered: false,
+    }),
+    checkedAt: "2026-06-27T15:00:00Z",
+  });
+
+  assert.equal(snapshot.engineHealth, "degraded");
+  assert.equal(snapshot.executionReady, false);
+  assert.equal(snapshot.simulationMode, true);
 });

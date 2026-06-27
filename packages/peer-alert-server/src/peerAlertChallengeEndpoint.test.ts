@@ -50,6 +50,7 @@ const lastAlert: PeerAlertPhoneAlertSnapshot = {
 
 function endpointConfig(overrides: Partial<{
   phoneEngineId: "phone:pixel-1" | "phone:other";
+  apiKey: string;
   getLastAlert: () => PeerAlertPhoneAlertSnapshot | null;
   recordOutcome: (outcome: PeerAlertChallengeEndpointOutcome) => void;
 }> = {}) {
@@ -64,11 +65,75 @@ function endpointConfig(overrides: Partial<{
     },
     getLastAlert: overrides.getLastAlert ?? (() => lastAlert),
   };
+  if (overrides.apiKey) {
+    config.apiKey = overrides.apiKey;
+  }
   if (overrides.recordOutcome) {
     config.recordOutcome = overrides.recordOutcome;
   }
   return config;
 }
+
+test("peer alert challenge endpoint rejects missing or wrong API keys before reading alert state", async () => {
+  let reads = 0;
+  const config = endpointConfig({
+    apiKey: "expected-secret",
+    getLastAlert: () => {
+      reads += 1;
+      return lastAlert;
+    },
+  });
+
+  const missing = await handlePeerAlertChallengeRequest(config, {
+    method: "POST",
+    path: PEER_ALERT_CHALLENGE_PATH,
+    body: challenge,
+  });
+  const wrong = await handlePeerAlertChallengeRequest(config, {
+    method: "POST",
+    path: PEER_ALERT_CHALLENGE_PATH,
+    headers: { "X-API-Key": "wrong-secret" },
+    body: challenge,
+  });
+  const valid = await handlePeerAlertChallengeRequest(config, {
+    method: "POST",
+    path: PEER_ALERT_CHALLENGE_PATH,
+    headers: { "X-API-Key": "expected-secret" },
+    body: challenge,
+  });
+
+  assert.equal(missing.status, 401);
+  assert.equal(missing.body.error, "Peer alert endpoint authentication failed.");
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.body.error, "Peer alert endpoint authentication failed.");
+  assert.equal(valid.status, 200);
+  assert.equal(reads, 1);
+});
+
+test("peer alert challenge fetch endpoint forwards request headers for API key validation", async () => {
+  const blocked = await handlePeerAlertChallengeFetchRequest(
+    endpointConfig({ apiKey: "expected-secret" }),
+    new Request(`http://phone.local${PEER_ALERT_CHALLENGE_PATH}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(challenge),
+    }),
+  );
+  const allowed = await handlePeerAlertChallengeFetchRequest(
+    endpointConfig({ apiKey: "expected-secret" }),
+    new Request(`http://phone.local${PEER_ALERT_CHALLENGE_PATH}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": "expected-secret",
+      },
+      body: JSON.stringify(challenge),
+    }),
+  );
+
+  assert.equal(blocked.status, 401);
+  assert.equal(allowed.status, 200);
+});
 
 test("peer alert challenge endpoint returns response evaluation and records latest outcome", async () => {
   const recorded: PeerAlertChallengeEndpointOutcome[] = [];

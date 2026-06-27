@@ -1,11 +1,12 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
+import type { ColorValue } from "react-native";
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 function tabIcon(name: IconName) {
-  return function Icon({ color, size }: { color: string; size: number }) {
+  return function Icon({ color, size }: { color: ColorValue; size: number }) {
     return <MaterialCommunityIcons name={name} color={color} size={size} />;
   };
 }

@@ -5,8 +5,12 @@ import { StatusPill } from "@/components/StatusPill";
 import {
   buildCockpitSummary,
   buildEngineCommunicationProofSummary,
-  useOperatorState,
 } from "@/state/operatorState";
+import { useAlertEvidenceState } from "@/state/alertEvidenceState";
+import { useLiveReadinessState } from "@/state/liveReadinessState";
+import { buildOperatorSnapshotFromEvidence } from "@/state/operatorDerivedState";
+import { usePhoneEngineRuntimeState } from "@/state/phoneEngineRuntimeState";
+import { useRemoteEngineState } from "@/state/remoteEngineState";
 import { useSettingsState } from "@/state/settingsState";
 
 function communicationTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
@@ -14,7 +18,16 @@ function communicationTone(blocking: boolean): "good" | "warn" | "bad" | "neutra
 }
 
 export function CockpitScreen() {
-  const snapshot = useOperatorState((state) => state.snapshot);
+  const remoteEngine = useRemoteEngineState((state) => state.snapshot);
+  const alertEvidence = useAlertEvidenceState((state) => state.snapshot);
+  const liveReadiness = useLiveReadinessState((state) => state.snapshot);
+  const phoneEngine = usePhoneEngineRuntimeState((state) => state.snapshot);
+  const snapshot = buildOperatorSnapshotFromEvidence({
+    remoteEngine,
+    alertEvidence,
+    liveReadiness,
+    phoneEngine,
+  });
   const failoverSettings = useSettingsState((state) => state.snapshot.failoverSettings);
   const summary = buildCockpitSummary(snapshot, failoverSettings);
   const communicationProof = buildEngineCommunicationProofSummary(snapshot);
