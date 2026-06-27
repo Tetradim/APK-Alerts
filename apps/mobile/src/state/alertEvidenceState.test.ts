@@ -1540,6 +1540,69 @@ test("alert reconciliation trace clears queued alert with exact reconciliation r
   assert.equal(summary.blocking, false);
 });
 
+test("alert reconciliation trace blocks queued alert with simulated reconciliation row", () => {
+  const queuedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-simulated-trace",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-simulated-trace",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
+        channel_url_allowed: true,
+        allowed_author_id_count: 1,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-simulated-trace",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const [row] = normalizeReconciliationPayload([
+    {
+      alert_id: "alert-simulated-trace",
+      trade_id: "trade-simulated-trace",
+      trade_status: "filled",
+      order_id: "order-simulated-trace",
+      position_id: "position-simulated-trace",
+      position_status: "open",
+      simulated: true,
+      attention_reason: "",
+    },
+  ]);
+  const chain = buildAlertEvidenceChains({ signals: [], decisions: [queuedDecision] })[0];
+  assert.ok(row);
+  const summary = buildAlertReconciliationTraceSummary(chain, [row]);
+
+  assert.equal(summary.gateLabel, "Trace blocked");
+  assert.equal(summary.alertLabel, "Alert alert-simulated-trace");
+  assert.equal(summary.reconciliationLabel, "Simulated reconciliation cannot prove broker execution");
+  assert.equal(summary.orderLabel, "Simulated order order-simulated-trace");
+  assert.equal(summary.positionLabel, "Simulated position position-simulated-trace - open");
+  assert.equal(summary.auditLabel, "Audit audit-simulated-trace");
+  assert.equal(summary.blocking, true);
+});
+
 test("alert reconciliation trace blocks queued alert without exact reconciliation row", () => {
   const queuedDecision = normalizeBridgeAlertDecisionEvent({
     id: "audit-missing-trace",

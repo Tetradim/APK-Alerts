@@ -378,6 +378,18 @@ export function buildAlertReconciliationTraceSummary(
     };
   }
 
+  if (row.simulated) {
+    return {
+      gateLabel: "Trace blocked",
+      alertLabel: `Alert ${ingestion.alertId}`,
+      reconciliationLabel: "Simulated reconciliation cannot prove broker execution",
+      orderLabel: formatTraceSimulatedOrderLabel(row),
+      positionLabel: formatTraceSimulatedPositionLabel(row),
+      auditLabel,
+      blocking: true,
+    };
+  }
+
   const blocking = row.liveBlocking;
   return {
     gateLabel: blocking ? "Trace blocked" : "Trace clear",
@@ -733,6 +745,29 @@ function formatTracePositionLabel(row: ReconciliationRow): string {
     return `No position expected (${row.tradeStatus})`;
   }
   return "Position proof missing";
+}
+
+function formatTraceSimulatedOrderLabel(row: ReconciliationRow): string {
+  if (row.orderId) {
+    return `Simulated order ${row.orderId}`;
+  }
+  if (row.tradeId) {
+    return `Simulated trade ${row.tradeId}; broker order id missing`;
+  }
+  return "Simulated order proof missing";
+}
+
+function formatTraceSimulatedPositionLabel(row: ReconciliationRow): string {
+  if (row.positionId && row.positionStatus) {
+    return `Simulated position ${row.positionId} - ${row.positionStatus}`;
+  }
+  if (row.positionId) {
+    return `Simulated position ${row.positionId}`;
+  }
+  if (isTraceTerminalNoFill(row.tradeStatus)) {
+    return `No position expected (${row.tradeStatus})`;
+  }
+  return "Simulated position proof missing";
 }
 
 function isTraceTerminalNoFill(status: string): boolean {
