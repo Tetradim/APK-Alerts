@@ -160,7 +160,7 @@ test("peer alert challenge endpoint responds fail-closed when phone has no alert
   assert.deepEqual(result.body.evaluation.blockingCodes, ["phone_alert_missing"]);
 });
 
-test("peer alert challenge endpoint returns mismatch evidence when challenge targets another phone", async () => {
+test("peer alert challenge endpoint rejects challenges addressed to another phone", async () => {
   const result = await handlePeerAlertChallengeRequest(
     endpointConfig({ phoneEngineId: "phone:other" }),
     {
@@ -170,10 +170,9 @@ test("peer alert challenge endpoint returns mismatch evidence when challenge tar
     },
   );
 
-  assert.equal(result.status, 200);
-  assert.ok(result.body.evaluation);
+  assert.equal(result.status, 409);
   assert.equal(result.body.ok, false);
-  assert.equal(result.body.response?.sourceEngineId, "phone:other");
-  assert.equal(result.body.evaluation.status, "mismatch");
-  assert.equal(result.body.evaluation.blockingCodes.includes("responder_engine_mismatch"), true);
+  assert.equal(result.body.response, null);
+  assert.equal(result.body.evaluation, null);
+  assert.equal(result.body.error, "Peer alert challenge targets phone:pixel-1, not phone:other.");
 });

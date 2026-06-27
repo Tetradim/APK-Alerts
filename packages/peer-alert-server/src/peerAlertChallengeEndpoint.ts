@@ -79,6 +79,14 @@ export async function handlePeerAlertChallengeRequest(
   }
 
   const challenge = request.body;
+  if (challenge.payload.targetEngineId !== config.phoneEngineId) {
+    return errorResponse(
+      409,
+      checkedAt,
+      `Peer alert challenge targets ${challenge.payload.targetEngineId}, not ${config.phoneEngineId}.`,
+    );
+  }
+
   const phoneAlert = await config.getLastAlert();
   const response = buildPhoneAlertPeerResponseEvent({
     challenge,

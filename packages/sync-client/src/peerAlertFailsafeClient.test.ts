@@ -112,6 +112,35 @@ test("remote peer alert client accepts raw response event and omits blank API ke
   assert.equal(result.evaluation.status, "matched");
 });
 
+test("remote peer alert client returns evaluated mismatch for valid blocked phone response", async () => {
+  const blockedResponse = createEvent({
+    id: "peer-response-blocked",
+    type: "alert.peer.response.v1",
+    sourceEngineId: "phone:pixel-1",
+    observedAt: "2026-06-27T18:00:03.000Z",
+    sequence: 102,
+    idempotencyKey: "peer-alert:response:challenge-1",
+    payload: {
+      ...phoneResponse.payload,
+      lastAlert: {
+        ...phoneResponse.payload.lastAlert!,
+        sourceKey: "other-alerts",
+      },
+    },
+  });
+  const result = await requestPhoneAlertPeerResponse({
+    baseApiUrl: "http://127.0.0.1:8001/api",
+    fetchImpl: async () => jsonResponse({ response: blockedResponse }),
+    now: () => "2026-06-27T18:00:04.000Z",
+  }, challenge);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "");
+  assert.equal(result.response?.id, "peer-response-blocked");
+  assert.equal(result.evaluation.status, "mismatch");
+  assert.equal(result.evaluation.blockingCodes.includes("source_key_mismatch"), true);
+});
+
 test("remote peer alert client fails closed for HTTP network and invalid response payloads", async () => {
   const httpResult = await requestPhoneAlertPeerResponse({
     baseApiUrl: "http://127.0.0.1:8001/api",

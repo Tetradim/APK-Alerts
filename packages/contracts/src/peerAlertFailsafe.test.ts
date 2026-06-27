@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createEvent } from "./events";
-import { buildPhoneAlertPeerResponseEvent, evaluateAlertPeerResponse } from "./peerAlertFailsafe";
+import { createEvent, type AlertPeerChallengeEvent, type AlertPeerResponseEvent } from "./events";
+import {
+  buildPhoneAlertPeerResponseEvent,
+  evaluateAlertPeerResponse,
+  type AlertPeerFailsafeBlockingCode,
+} from "./peerAlertFailsafe";
 
 const challenge = createEvent({
   id: "peer-challenge-1",
@@ -24,12 +28,15 @@ const challenge = createEvent({
   },
 });
 
-function response(overrides: Partial<ReturnType<typeof baseResponsePayload>> = {}) {
+function response(
+  overrides: Partial<AlertPeerResponseEvent["payload"]> = {},
+  eventOverrides: Partial<Pick<AlertPeerResponseEvent, "sourceEngineId" | "observedAt">> = {},
+) {
   return createEvent({
     id: `peer-response-${overrides.challengeId ?? "1"}`,
     type: "alert.peer.response.v1",
-    sourceEngineId: "phone:pixel-1",
-    observedAt: "2026-06-27T18:00:03.000Z",
+    sourceEngineId: eventOverrides.sourceEngineId ?? "phone:pixel-1",
+    observedAt: eventOverrides.observedAt ?? "2026-06-27T18:00:03.000Z",
     sequence: 101,
     idempotencyKey: "peer-alert:response:challenge-1",
     payload: {
@@ -62,6 +69,28 @@ function baseResponsePayload() {
   };
 }
 
+function challengeWith(overrides: Partial<AlertPeerChallengeEvent["payload"]>) {
+  return createEvent({
+    ...challenge,
+    id: `peer-challenge-${overrides.challengeId ?? "override"}`,
+    payload: {
+      ...challenge.payload,
+      ...overrides,
+    },
+  });
+}
+
+function assertBlocks(
+  name: string,
+  evaluation: ReturnType<typeof evaluateAlertPeerResponse>,
+  code: AlertPeerFailsafeBlockingCode,
+  status: "mismatch" | "stale" = "mismatch",
+) {
+  assert.equal(evaluation.status, status, name);
+  assert.equal(evaluation.blocking, true, name);
+  assert.equal(evaluation.blockingCodes.includes(code), true, name);
+}
+
 test("phone alert peer response builder echoes challenge identity and last alert copy", () => {
   const built = buildPhoneAlertPeerResponseEvent({
     challenge,
@@ -83,6 +112,24 @@ test("phone alert peer response builder echoes challenge identity and last alert
   assert.equal(built.payload.leaseId, "lease-phone-1");
   assert.equal(built.payload.responderEngineId, "phone:pixel-1");
   assert.equal(built.payload.lastAlert?.sourceKey, "chrome-alerts");
+});
+
+test("phone alert peer response builder rejects challenges addressed to another phone", () => {
+  assert.throws(
+    () =>
+      buildPhoneAlertPeerResponseEvent({
+        challenge,
+        responseEventId: "peer-response-wrong-phone",
+        responderEngineId: "phone:other",
+        observedAt: "2026-06-27T18:00:03.000Z",
+        sequence: 101,
+        phoneObservedAt: "2026-06-27T18:00:02.000Z",
+        phoneReceivedAt: "2026-06-27T18:00:02.250Z",
+        respondedAt: "2026-06-27T18:00:03.000Z",
+        lastAlert: baseResponsePayload().lastAlert,
+      }),
+    /Responder phone:other does not match challenge target phone:pixel-1/,
+  );
 });
 
 test("peer alert failsafe matches exact phone response within timestamp skew", () => {
@@ -141,6 +188,42 @@ test("peer alert failsafe blocks blank required identity proof", () => {
   assert.equal(blank.blockingCodes.includes("source_key_missing"), true);
 });
 
+test("peer alert failsafe covers challenge response envelope blockers", () => {
+  const cases: Array<{
+    name: string;
+    evaluation: ReturnType<typeof evaluateAlertPeerResponse>;
+    code: AlertPeerFailsafeBlockingCode;
+  }> = [
+    {
+      name: "challenge id mismatch",
+      evaluation: evaluateAlertPeerResponse(challenge, response({ challengeId: "challenge-2" })),
+      code: "challenge_id_mismatch",
+    },
+    {
+      name: "lease id mismatch",
+      evaluation: evaluateAlertPeerResponse(challenge, response({ leaseId: "lease-remote-2" })),
+      code: "lease_id_mismatch",
+    },
+    {
+      name: "responder engine mismatch",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({ responderEngineId: "phone:other" }, { sourceEngineId: "phone:other" }),
+      ),
+      code: "responder_engine_mismatch",
+    },
+    {
+      name: "phone alert missing",
+      evaluation: evaluateAlertPeerResponse(challenge, response({ lastAlert: null })),
+      code: "phone_alert_missing",
+    },
+  ];
+
+  for (const item of cases) {
+    assertBlocks(item.name, item.evaluation, item.code);
+  }
+});
+
 test("peer alert failsafe blocks mismatched source and alert fingerprint", () => {
   const mismatch = evaluateAlertPeerResponse(
     challenge,
@@ -159,6 +242,52 @@ test("peer alert failsafe blocks mismatched source and alert fingerprint", () =>
   assert.equal(mismatch.blockingCodes.includes("normalized_text_hash_mismatch"), true);
 });
 
+test("peer alert failsafe covers alert fingerprint blockers", () => {
+  const baseAlert = baseResponsePayload().lastAlert;
+  const cases: Array<{
+    name: string;
+    evaluation: ReturnType<typeof evaluateAlertPeerResponse>;
+    code: AlertPeerFailsafeBlockingCode;
+  }> = [
+    {
+      name: "discord message id mismatch",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({ lastAlert: { ...baseAlert, discordMessageId: "discord-message-2" } }),
+      ),
+      code: "discord_message_id_mismatch",
+    },
+    {
+      name: "channel id mismatch",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({ lastAlert: { ...baseAlert, channelId: "other-alerts" } }),
+      ),
+      code: "channel_id_mismatch",
+    },
+    {
+      name: "author id mismatch",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({ lastAlert: { ...baseAlert, authorId: "other-author" } }),
+      ),
+      code: "author_id_mismatch",
+    },
+    {
+      name: "message url mismatch",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({ lastAlert: { ...baseAlert, messageUrl: "https://discord.com/channels/server/chrome-alerts/2" } }),
+      ),
+      code: "message_url_mismatch",
+    },
+  ];
+
+  for (const item of cases) {
+    assertBlocks(item.name, item.evaluation, item.code);
+  }
+});
+
 test("peer alert failsafe blocks stale phone alert observation", () => {
   const stale = evaluateAlertPeerResponse(
     challenge,
@@ -172,4 +301,69 @@ test("peer alert failsafe blocks stale phone alert observation", () => {
   assert.equal(stale.blocking, true);
   assert.deepEqual(stale.blockingCodes, ["alert_timestamp_skew_exceeded"]);
   assert.equal(stale.skewMs, 12000);
+});
+
+test("peer alert failsafe covers timing blockers", () => {
+  const cases: Array<{
+    name: string;
+    evaluation: ReturnType<typeof evaluateAlertPeerResponse>;
+    code: AlertPeerFailsafeBlockingCode;
+  }> = [
+    {
+      name: "remote observed at invalid",
+      evaluation: evaluateAlertPeerResponse(challengeWith({ remoteObservedAt: "not a timestamp" }), response()),
+      code: "remote_observed_at_invalid",
+    },
+    {
+      name: "phone observed at invalid",
+      evaluation: evaluateAlertPeerResponse(challenge, response({ phoneObservedAt: "not a timestamp" })),
+      code: "phone_observed_at_invalid",
+    },
+    {
+      name: "phone received at invalid",
+      evaluation: evaluateAlertPeerResponse(challenge, response({ phoneReceivedAt: "not a timestamp" })),
+      code: "phone_received_at_invalid",
+    },
+    {
+      name: "response observed at invalid",
+      evaluation: evaluateAlertPeerResponse(challenge, response({}, { observedAt: "not a timestamp" })),
+      code: "response_observed_at_invalid",
+    },
+    {
+      name: "phone received before observed",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({ phoneReceivedAt: "2026-06-27T18:00:01.900Z" }),
+      ),
+      code: "phone_received_before_observed",
+    },
+    {
+      name: "responded before received",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({ respondedAt: "2026-06-27T18:00:02.100Z" }),
+      ),
+      code: "responded_before_received",
+    },
+    {
+      name: "response observed before responded",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({}, { observedAt: "2026-06-27T18:00:02.900Z" }),
+      ),
+      code: "response_observed_before_responded",
+    },
+    {
+      name: "response observed before received",
+      evaluation: evaluateAlertPeerResponse(
+        challenge,
+        response({}, { observedAt: "2026-06-27T18:00:02.100Z" }),
+      ),
+      code: "response_observed_before_received",
+    },
+  ];
+
+  for (const item of cases) {
+    assertBlocks(item.name, item.evaluation, item.code, "stale");
+  }
 });

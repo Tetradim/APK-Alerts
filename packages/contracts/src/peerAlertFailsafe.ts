@@ -66,9 +66,19 @@ export interface BuildPhoneAlertPeerResponseEventInput {
 
 const DEFAULT_MAX_ALERT_SKEW_MS = 10_000;
 
+interface PeerTimingProof {
+  skewMs: number | null;
+}
+
 export function buildPhoneAlertPeerResponseEvent(
   input: BuildPhoneAlertPeerResponseEventInput,
 ): AlertPeerResponseEvent {
+  if (input.responderEngineId !== input.challenge.payload.targetEngineId) {
+    throw new Error(
+      `Responder ${input.responderEngineId} does not match challenge target ${input.challenge.payload.targetEngineId}`,
+    );
+  }
+
   return createEvent({
     id: input.responseEventId,
     type: "alert.peer.response.v1",
@@ -114,16 +124,35 @@ export function evaluateAlertPeerResponse(
   }
 
   const responsePayload = response.payload;
-  const phoneAlert = responsePayload.lastAlert;
-  const remoteObservedAtMs = parseTimestamp(challengePayload.remoteObservedAt);
-  const phoneObservedAtMs = parseTimestamp(responsePayload.phoneObservedAt);
-  const phoneReceivedAtMs = parseTimestamp(responsePayload.phoneReceivedAt);
-  const respondedAtMs = parseTimestamp(responsePayload.respondedAt);
-  const responseObservedAtMs = parseTimestamp(response.observedAt);
-  const skewMs = remoteObservedAtMs !== null && phoneObservedAtMs !== null
-    ? Math.abs(phoneObservedAtMs - remoteObservedAtMs)
-    : null;
   const blockingCodes: AlertPeerFailsafeBlockingCode[] = [];
+
+  validatePeerEnvelope(blockingCodes, challenge, response);
+  validateAlertFingerprint(blockingCodes, challengePayload, responsePayload.lastAlert);
+  const timing = validatePeerTiming(blockingCodes, challenge, response, maxAlertSkewMs);
+
+  const status = classifyPeerStatus(blockingCodes);
+  return {
+    status,
+    blocking: blockingCodes.length > 0,
+    blockingCodes,
+    challengeId: challengePayload.challengeId,
+    remoteEngineId: challenge.sourceEngineId,
+    targetEngineId: challengePayload.targetEngineId,
+    responderEngineId: response.sourceEngineId,
+    discordMessageId: challengePayload.discordMessageId,
+    sourceKey: challengePayload.sourceKey,
+    skewMs: timing.skewMs,
+    detailLabel: buildDetailLabel(status, challengePayload.challengeId, timing.skewMs),
+  };
+}
+
+function validatePeerEnvelope(
+  blockingCodes: AlertPeerFailsafeBlockingCode[],
+  challenge: AlertPeerChallengeEvent,
+  response: AlertPeerResponseEvent,
+): void {
+  const challengePayload = challenge.payload;
+  const responsePayload = response.payload;
 
   validateRequiredChallengeFields(blockingCodes, challengePayload);
   addIf(blockingCodes, responsePayload.challengeId !== challengePayload.challengeId, "challenge_id_mismatch");
@@ -134,13 +163,38 @@ export function evaluateAlertPeerResponse(
       responsePayload.responderEngineId !== challengePayload.targetEngineId,
     "responder_engine_mismatch",
   );
+}
 
+function validateAlertFingerprint(
+  blockingCodes: AlertPeerFailsafeBlockingCode[],
+  challenge: AlertPeerChallengeEvent["payload"],
+  phoneAlert: PeerAlertFingerprint | null,
+): void {
   if (!phoneAlert) {
     blockingCodes.push("phone_alert_missing");
-  } else {
-    validateRequiredPhoneAlertFields(blockingCodes, phoneAlert);
-    compareAlertFingerprint(blockingCodes, challengePayload, phoneAlert);
+    return;
   }
+
+  validateRequiredPhoneAlertFields(blockingCodes, phoneAlert);
+  compareAlertFingerprint(blockingCodes, challenge, phoneAlert);
+}
+
+function validatePeerTiming(
+  blockingCodes: AlertPeerFailsafeBlockingCode[],
+  challenge: AlertPeerChallengeEvent,
+  response: AlertPeerResponseEvent,
+  maxAlertSkewMs: number,
+): PeerTimingProof {
+  const challengePayload = challenge.payload;
+  const responsePayload = response.payload;
+  const remoteObservedAtMs = parseTimestamp(challengePayload.remoteObservedAt);
+  const phoneObservedAtMs = parseTimestamp(responsePayload.phoneObservedAt);
+  const phoneReceivedAtMs = parseTimestamp(responsePayload.phoneReceivedAt);
+  const respondedAtMs = parseTimestamp(responsePayload.respondedAt);
+  const responseObservedAtMs = parseTimestamp(response.observedAt);
+  const skewMs = remoteObservedAtMs !== null && phoneObservedAtMs !== null
+    ? Math.abs(phoneObservedAtMs - remoteObservedAtMs)
+    : null;
 
   addIf(blockingCodes, remoteObservedAtMs === null, "remote_observed_at_invalid");
   addIf(blockingCodes, phoneObservedAtMs === null, "phone_observed_at_invalid");
@@ -173,20 +227,7 @@ export function evaluateAlertPeerResponse(
     "alert_timestamp_skew_exceeded",
   );
 
-  const status = classifyStatus(blockingCodes);
-  return {
-    status,
-    blocking: blockingCodes.length > 0,
-    blockingCodes,
-    challengeId: challengePayload.challengeId,
-    remoteEngineId: challenge.sourceEngineId,
-    targetEngineId: challengePayload.targetEngineId,
-    responderEngineId: response.sourceEngineId,
-    discordMessageId: challengePayload.discordMessageId,
-    sourceKey: challengePayload.sourceKey,
-    skewMs,
-    detailLabel: buildDetailLabel(status, challengePayload.challengeId, skewMs),
-  };
+  return { skewMs };
 }
 
 function validateRequiredChallengeFields(
@@ -234,7 +275,7 @@ function compareAlertFingerprint(
   );
 }
 
-function classifyStatus(blockingCodes: AlertPeerFailsafeBlockingCode[]): AlertPeerFailsafeStatus {
+function classifyPeerStatus(blockingCodes: AlertPeerFailsafeBlockingCode[]): AlertPeerFailsafeStatus {
   if (blockingCodes.length === 0) {
     return "matched";
   }
