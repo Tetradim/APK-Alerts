@@ -38,25 +38,29 @@ export function EnginesScreen() {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Remote Consolidation API</Text>
+        <Text style={styles.fieldLabel}>Remote API URL</Text>
         <TextInput
           value={snapshot.connection.baseApiUrl}
           onChangeText={(baseApiUrl) =>
             updateConnectionDraft({ baseApiUrl, apiKey: snapshot.connection.apiKey })
           }
           placeholder="http://100.x.x.x:8001/api"
-          placeholderTextColor="#64748b"
+          placeholderTextColor="#94a3b8"
+          accessibilityLabel="Remote API URL"
           autoCapitalize="none"
           autoCorrect={false}
           inputMode="url"
           style={styles.input}
         />
+        <Text style={styles.fieldLabel}>API key</Text>
         <TextInput
           value={snapshot.connection.apiKey}
           onChangeText={(apiKey) =>
             updateConnectionDraft({ baseApiUrl: snapshot.connection.baseApiUrl, apiKey })
           }
           placeholder="API key if required"
-          placeholderTextColor="#64748b"
+          placeholderTextColor="#94a3b8"
+          accessibilityLabel="API key"
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
@@ -99,6 +103,7 @@ const styles = StyleSheet.create({
   heading: { color: "#f8fafc", fontSize: 24, fontWeight: "900", marginTop: 4 },
   panel: { backgroundColor: "#111827", borderColor: "#334155", borderRadius: 8, borderWidth: 1, gap: 10, padding: 14 },
   panelTitle: { color: "#f8fafc", fontSize: 16, fontWeight: "900" },
+  fieldLabel: { color: "#cbd5e1", fontSize: 13, fontWeight: "800" },
   input: {
     backgroundColor: "#020617",
     borderColor: "#334155",
