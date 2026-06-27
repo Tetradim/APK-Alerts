@@ -56,6 +56,16 @@ export interface ReplayAcceptanceEvidenceSummary {
   blocking: boolean;
 }
 
+export interface ExitProtectionEvidenceSummary {
+  statusLabel: string;
+  gateLabel: string;
+  configurationLabel: string;
+  capabilityLabel: string;
+  unprotectedPositionsLabel: string;
+  metadataOnlyPositionsLabel: string;
+  blocking: boolean;
+}
+
 export interface LiveReadinessState {
   snapshot: LiveReadinessSnapshot;
   activeRequestId: number;
@@ -146,6 +156,44 @@ export function buildReplayAcceptanceEvidenceSummary(
     failedEventsLabel: formatReplayEventEvidenceLabel("Failed", replay.failedEventIds, replay.failedEventCount),
     missingEventsLabel: formatReplayEventEvidenceLabel("Missing", replay.missingEventIds, replay.missingEventCount),
     blocking: !passed,
+  };
+}
+
+export function buildExitProtectionEvidenceSummary(
+  snapshot: LiveReadinessSnapshot,
+): ExitProtectionEvidenceSummary {
+  const exits = snapshot.remote.readiness.checks.exitAutomation;
+  const hasBrokerExitCapabilities = exits.brokerOrderStatusSupported && exits.brokerCancelSupported;
+  const hasUnprotectedPositions =
+    exits.unprotectedOpenPositionCount > 0 ||
+    exits.unprotectedOpenPositionIds.length > 0;
+  const hasMetadataOnlyPositions =
+    exits.metadataOnlyOpenPositionCount > 0 ||
+    exits.metadataOnlyOpenPositionIds.length > 0;
+  const protectedByOco =
+    exits.ocoExitsConfigured &&
+    hasBrokerExitCapabilities &&
+    !hasUnprotectedPositions &&
+    !hasMetadataOnlyPositions;
+
+  return {
+    statusLabel: protectedByOco ? "OCO exits protected" : "OCO exits blocking",
+    gateLabel: protectedByOco ? "Exit gate clear" : "Blocks live",
+    configurationLabel: exits.ocoExitsConfigured ? "OCO exits configured" : "OCO exits missing",
+    capabilityLabel: hasBrokerExitCapabilities
+      ? "Broker can monitor and cancel exits"
+      : "Broker exit automation capabilities missing",
+    unprotectedPositionsLabel: formatPositionEvidenceLabel(
+      "Unprotected",
+      exits.unprotectedOpenPositionIds,
+      exits.unprotectedOpenPositionCount,
+    ),
+    metadataOnlyPositionsLabel: formatPositionEvidenceLabel(
+      "Metadata-only",
+      exits.metadataOnlyOpenPositionIds,
+      exits.metadataOnlyOpenPositionCount,
+    ),
+    blocking: !protectedByOco,
   };
 }
 
@@ -289,4 +337,14 @@ function formatReplayEventEvidenceLabel(label: "Failed" | "Missing", eventIds: s
     return `${label} events: ${eventCount} unlisted`;
   }
   return `${label} events: none`;
+}
+
+function formatPositionEvidenceLabel(label: "Unprotected" | "Metadata-only", positionIds: string[], count: number): string {
+  if (positionIds.length > 0) {
+    return `${label} positions: ${positionIds.join(", ")}`;
+  }
+  if (count > 0) {
+    return `${label} positions: ${count} unlisted`;
+  }
+  return `${label} positions: none`;
 }

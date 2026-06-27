@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeLiveReadinessPayload } from "@apk-alerts/contracts";
 import {
+  buildExitProtectionEvidenceSummary,
   buildReplayAcceptanceEvidenceSummary,
   buildLiveReadinessSummary,
   createLiveReadinessStore,
@@ -214,6 +215,63 @@ test("replay acceptance evidence treats empty proof as blocking", () => {
   assert.equal(summary.gateLabel, "Blocks live");
   assert.equal(summary.detailLabel, "0/0 expected alert(s) accepted");
   assert.equal(summary.proofLabel, "No replay proof timestamp or URL");
+  assert.equal(summary.blocking, true);
+});
+
+test("exit protection evidence summarizes all-clear OCO coverage as non-blocking", () => {
+  const summary = buildExitProtectionEvidenceSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: readinessSnapshot(),
+  });
+
+  assert.equal(summary.statusLabel, "OCO exits protected");
+  assert.equal(summary.gateLabel, "Exit gate clear");
+  assert.equal(summary.capabilityLabel, "Broker can monitor and cancel exits");
+  assert.equal(summary.unprotectedPositionsLabel, "Unprotected positions: none");
+  assert.equal(summary.metadataOnlyPositionsLabel, "Metadata-only positions: none");
+  assert.equal(summary.blocking, false);
+});
+
+test("exit protection evidence exposes unprotected and metadata-only position IDs as blocking", () => {
+  const blockedPayload = {
+    ...readyPayload,
+    ready_for_live: false,
+    blocking_issues: [{ code: "oco_exit_protection_missing", message: "Open positions are missing OCO exits." }],
+    blocking_codes: ["oco_exit_protection_missing"],
+    checks: {
+      ...readyPayload.checks,
+      exit_automation: {
+        ...readyPayload.checks.exit_automation,
+        oco_exits_configured: false,
+        unprotected_open_position_count: 2,
+        unprotected_open_position_ids: ["pos-1", "pos-2"],
+        metadata_only_open_position_count: 1,
+        metadata_only_open_position_ids: ["pos-3"],
+      },
+    },
+  };
+  const summary = buildExitProtectionEvidenceSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: readinessSnapshot(blockedPayload),
+  });
+
+  assert.equal(summary.statusLabel, "OCO exits blocking");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.configurationLabel, "OCO exits missing");
+  assert.equal(summary.unprotectedPositionsLabel, "Unprotected positions: pos-1, pos-2");
+  assert.equal(summary.metadataOnlyPositionsLabel, "Metadata-only positions: pos-3");
+  assert.equal(summary.blocking, true);
+});
+
+test("exit protection evidence treats default empty readiness as blocking", () => {
+  const summary = buildExitProtectionEvidenceSummary(getDefaultLiveReadinessSnapshot());
+
+  assert.equal(summary.statusLabel, "OCO exits blocking");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.configurationLabel, "OCO exits missing");
+  assert.equal(summary.capabilityLabel, "Broker exit automation capabilities missing");
+  assert.equal(summary.unprotectedPositionsLabel, "Unprotected positions: none");
+  assert.equal(summary.metadataOnlyPositionsLabel, "Metadata-only positions: none");
   assert.equal(summary.blocking, true);
 });
 

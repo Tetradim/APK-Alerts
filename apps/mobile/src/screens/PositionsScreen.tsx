@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
+import { buildExitProtectionEvidenceSummary, useLiveReadinessState } from "@/state/liveReadinessState";
 import { buildReconciliationSummary, useReconciliationState } from "@/state/reconciliationState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
 
@@ -18,17 +19,33 @@ function statusTone(label: string): "good" | "warn" | "bad" | "neutral" {
 
 export function PositionsScreen() {
   const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
-  const snapshot = useReconciliationState((state) => state.snapshot);
-  const updateConnectionDraft = useReconciliationState((state) => state.updateConnectionDraft);
+  const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
+  const updateReconciliationConnectionDraft = useReconciliationState((state) => state.updateConnectionDraft);
   const checkReconciliation = useReconciliationState((state) => state.checkReconciliation);
-  const summary = buildReconciliationSummary(snapshot);
+  const liveReadinessSnapshot = useLiveReadinessState((state) => state.snapshot);
+  const updateLiveReadinessConnectionDraft = useLiveReadinessState((state) => state.updateConnectionDraft);
+  const checkLiveReadiness = useLiveReadinessState((state) => state.checkReadiness);
+  const summary = buildReconciliationSummary(reconciliationSnapshot);
+  const exitProtection = buildExitProtectionEvidenceSummary(liveReadinessSnapshot);
+  const exitLastCheckLabel = liveReadinessSnapshot.remote.checkedAt
+    ? `Checked ${liveReadinessSnapshot.remote.checkedAt}`
+    : "Never checked";
 
   useEffect(() => {
     if (
-      remoteConnection.baseApiUrl !== snapshot.connection.baseApiUrl ||
-      remoteConnection.apiKey !== snapshot.connection.apiKey
+      remoteConnection.baseApiUrl !== reconciliationSnapshot.connection.baseApiUrl ||
+      remoteConnection.apiKey !== reconciliationSnapshot.connection.apiKey
     ) {
-      updateConnectionDraft({
+      updateReconciliationConnectionDraft({
+        baseApiUrl: remoteConnection.baseApiUrl,
+        apiKey: remoteConnection.apiKey,
+      });
+    }
+    if (
+      remoteConnection.baseApiUrl !== liveReadinessSnapshot.connection.baseApiUrl ||
+      remoteConnection.apiKey !== liveReadinessSnapshot.connection.apiKey
+    ) {
+      updateLiveReadinessConnectionDraft({
         baseApiUrl: remoteConnection.baseApiUrl,
         apiKey: remoteConnection.apiKey,
       });
@@ -36,9 +53,12 @@ export function PositionsScreen() {
   }, [
     remoteConnection.baseApiUrl,
     remoteConnection.apiKey,
-    snapshot.connection.baseApiUrl,
-    snapshot.connection.apiKey,
-    updateConnectionDraft,
+    reconciliationSnapshot.connection.baseApiUrl,
+    reconciliationSnapshot.connection.apiKey,
+    liveReadinessSnapshot.connection.baseApiUrl,
+    liveReadinessSnapshot.connection.apiKey,
+    updateReconciliationConnectionDraft,
+    updateLiveReadinessConnectionDraft,
   ]);
 
   return (
@@ -59,12 +79,12 @@ export function PositionsScreen() {
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ busy: snapshot.checking, disabled: snapshot.checking }}
-            disabled={snapshot.checking}
+            accessibilityState={{ busy: reconciliationSnapshot.checking, disabled: reconciliationSnapshot.checking }}
+            disabled={reconciliationSnapshot.checking}
             onPress={() => void checkReconciliation()}
-            style={[styles.button, snapshot.checking ? styles.buttonDisabled : null]}
+            style={[styles.button, reconciliationSnapshot.checking ? styles.buttonDisabled : null]}
           >
-            <Text style={styles.buttonText}>{snapshot.checking ? "Checking" : "Check"}</Text>
+            <Text style={styles.buttonText}>{reconciliationSnapshot.checking ? "Checking" : "Check"}</Text>
           </Pressable>
         </View>
         <Text style={styles.detail}>{summary.lastCheckLabel}</Text>
@@ -76,7 +96,34 @@ export function PositionsScreen() {
         <MetricTile label="Paper" value={summary.simulatedLabel} detail="Simulated unresolved rows do not block live readiness" />
       </View>
 
-      {snapshot.remote.rows.length === 0 ? (
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>OCO exit protection</Text>
+            <Text style={styles.panelTitle}>{exitProtection.statusLabel}</Text>
+          </View>
+          <StatusPill label={exitProtection.gateLabel} tone={exitProtection.blocking ? "bad" : "good"} />
+        </View>
+        <Text style={styles.detail}>{exitProtection.configurationLabel}</Text>
+        <Text style={styles.detail}>{exitProtection.capabilityLabel}</Text>
+        <Text style={styles.detail}>{exitProtection.unprotectedPositionsLabel}</Text>
+        <Text style={styles.detail}>{exitProtection.metadataOnlyPositionsLabel}</Text>
+        <View style={styles.panelFooter}>
+          <Text style={[styles.detail, styles.footerDetail]}>{exitLastCheckLabel}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: liveReadinessSnapshot.checking, disabled: liveReadinessSnapshot.checking }}
+            disabled={liveReadinessSnapshot.checking}
+            onPress={() => void checkLiveReadiness()}
+            style={[styles.secondaryButton, liveReadinessSnapshot.checking ? styles.buttonDisabled : null]}
+          >
+            <Text style={styles.secondaryButtonText}>{liveReadinessSnapshot.checking ? "Checking" : "Check exits"}</Text>
+          </Pressable>
+        </View>
+        {liveReadinessSnapshot.lastError ? <Text style={styles.error}>{liveReadinessSnapshot.lastError}</Text> : null}
+      </View>
+
+      {reconciliationSnapshot.remote.rows.length === 0 ? (
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>No reconciliation rows</Text>
           <Text style={styles.detail}>
@@ -84,7 +131,7 @@ export function PositionsScreen() {
           </Text>
         </View>
       ) : (
-        snapshot.remote.rows.slice(0, 12).map((row) => (
+        reconciliationSnapshot.remote.rows.slice(0, 12).map((row) => (
           <View key={`${row.alertId}-${row.tradeId}-${row.positionId}`} style={styles.panel}>
             <View style={styles.panelHeader}>
               <View style={styles.headerCopy}>
@@ -108,6 +155,7 @@ export function PositionsScreen() {
 const styles = StyleSheet.create({
   headerRow: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   panelHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  panelFooter: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   headerCopy: { flex: 1 },
   label: { color: "#94a3b8", fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
   heading: { color: "#f8fafc", fontSize: 24, fontWeight: "900", marginTop: 4 },
@@ -116,6 +164,7 @@ const styles = StyleSheet.create({
   panelTitle: { color: "#f8fafc", fontSize: 16, fontWeight: "900" },
   value: { color: "#f8fafc", fontSize: 15, fontWeight: "900", lineHeight: 21, marginTop: 4 },
   detail: { color: "#cbd5e1", fontSize: 13, lineHeight: 19 },
+  footerDetail: { flex: 1 },
   error: { color: "#fca5a5", fontSize: 13, fontWeight: "800" },
   button: {
     alignItems: "center",
@@ -128,4 +177,15 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.55 },
   buttonText: { color: "#ffffff", fontSize: 14, fontWeight: "900", textAlign: "center" },
+  secondaryButton: {
+    alignItems: "center",
+    borderColor: "#475569",
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 40,
+    justifyContent: "center",
+    minWidth: 112,
+    paddingHorizontal: 12,
+  },
+  secondaryButtonText: { color: "#f8fafc", fontSize: 13, fontWeight: "900", textAlign: "center" },
 });
