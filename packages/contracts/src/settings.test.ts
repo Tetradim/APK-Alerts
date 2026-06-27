@@ -71,3 +71,40 @@ test("transport labels reflect Tailscale and cloud fallback choices", () => {
     "Cloud relay with Tailscale fallback",
   );
 });
+
+test("malformed boolean settings use defaults instead of runtime coercion", () => {
+  const phoneSettings = normalizeFailoverSettings({
+    phoneEngineEnabled: "false" as unknown as boolean,
+  });
+  const remoteInput = {
+    phoneEngineEnabled: false,
+    remoteEngineEnabled: "false" as unknown as boolean,
+  };
+  const remoteSettings = normalizeFailoverSettings(remoteInput);
+
+  assert.deepEqual(phoneSettings, DEFAULT_FAILOVER_SETTINGS);
+  assert.equal(phoneSettings.phoneEngineEnabled, true);
+  assert.equal(remoteSettings.remoteEngineEnabled, true);
+  assert.equal(typeof remoteSettings.remoteEngineEnabled, "boolean");
+  assert.equal(canAnyEngineRun(remoteInput), true);
+});
+
+test("invalid engine priority normalizes to the default phone-first preference", () => {
+  const settings = {
+    ...DEFAULT_FAILOVER_SETTINGS,
+    enginePriority: "remote_only" as never,
+  };
+
+  assert.equal(normalizeFailoverSettings(settings).enginePriority, "phone_then_remote");
+  assert.equal(buildEnginePriorityLabel(settings), "Phone then Remote");
+});
+
+test("invalid transport preference normalizes to Tailscale and labels Tailscale", () => {
+  const settings = {
+    ...DEFAULT_FAILOVER_SETTINGS,
+    transportPreference: "cloud_only" as never,
+  };
+
+  assert.equal(normalizeFailoverSettings(settings).transportPreference, "tailscale_first");
+  assert.equal(buildTransportLabel(settings), "Tailscale with cloud fallback");
+});
