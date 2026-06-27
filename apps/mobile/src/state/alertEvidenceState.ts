@@ -190,8 +190,9 @@ export function buildAlertTestEvidenceSummary(chain: AlertEvidenceChain | null |
   const queue = buildQueuePlaceEvidenceSummary(chain);
   const contract = buildAlertContractProofSummary(chain);
   const parser = buildAlertParserProofSummary(chain);
+  const capture = buildAlertCaptureProofSummary(chain);
   const hasAuditProof = Boolean(chain.decision?.auditEventId);
-  const clear = contract.passed && parser.passed && !source.blocking && !queue.blocking && hasAuditProof;
+  const clear = contract.passed && parser.passed && !source.blocking && !queue.blocking && hasAuditProof && capture.passed;
 
   return {
     modeLabel: formatAlertTestModeLabel(Boolean(chain.signal), Boolean(chain.decision)),
@@ -201,7 +202,7 @@ export function buildAlertTestEvidenceSummary(chain: AlertEvidenceChain | null |
     sourceLabel: source.statusLabel,
     queueLabel: formatAlertTestQueueLabel(queue),
     auditLabel: chain.decision?.auditEventId ? `Audit ${chain.decision.auditEventId}` : "Audit proof missing",
-    captureLabel: formatAlertTestCaptureLabel(chain),
+    captureLabel: capture.label,
     blocking: !clear,
   };
 }
@@ -217,6 +218,19 @@ function buildAlertParserProofSummary(chain: AlertEvidenceChain): { passed: bool
     return { passed: false, label: "Signal/audit parsed payload mismatch" };
   }
   return { passed: true, label: `Parser proof ${chain.parserConfidence}` };
+}
+
+function buildAlertCaptureProofSummary(chain: AlertEvidenceChain): { passed: boolean; label: string } {
+  if (!chain.signal) {
+    return { passed: true, label: formatAlertTestCaptureLabel(chain) };
+  }
+  if (chain.signal.capturePath) {
+    return { passed: true, label: `Capture ${chain.signal.capturePath}` };
+  }
+  if (chain.signal.messageUrl) {
+    return { passed: true, label: `Message ${chain.signal.messageUrl}` };
+  }
+  return { passed: false, label: "Physical capture proof missing" };
 }
 
 function canonicalJson(value: unknown): string {
