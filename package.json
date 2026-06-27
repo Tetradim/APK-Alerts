@@ -1,0 +1,22 @@
+{
+  "name": "apk-alerts",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@11.14.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "mobile:dev": "npm --workspace @apk-alerts/mobile run dev",
+    "mobile:android": "npm --workspace @apk-alerts/mobile run android",
+    "mobile:web": "npm --workspace @apk-alerts/mobile run web"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3"
+  }
+}
