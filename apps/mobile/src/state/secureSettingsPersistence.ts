@@ -1,8 +1,14 @@
-import { normalizeFailoverSettings, type FailoverSettings } from "@apk-alerts/contracts";
+import {
+  normalizeDiscordIngestionSettings,
+  normalizeFailoverSettings,
+  type DiscordIngestionSettings,
+  type FailoverSettings,
+} from "@apk-alerts/contracts";
 import type { RemoteConnectionDraft } from "./remoteEngineState";
 
 export const REMOTE_CONNECTION_STORAGE_KEY = "apk-alerts.remote-connection.v1";
 export const FAILOVER_SETTINGS_STORAGE_KEY = "apk-alerts.failover-settings.v1";
+export const DISCORD_INGESTION_SETTINGS_STORAGE_KEY = "apk-alerts.discord-ingestion-settings.v1";
 
 export interface SecureSettingsStorage {
   getItemAsync: (key: string) => Promise<string | null>;
@@ -50,6 +56,16 @@ export async function saveFailoverSettings(
   );
 }
 
+export async function saveDiscordIngestionSettings(
+  storage: SecureSettingsStorage,
+  settings: DiscordIngestionSettings,
+): Promise<void> {
+  await storage.setItemAsync(
+    DISCORD_INGESTION_SETTINGS_STORAGE_KEY,
+    JSON.stringify(normalizeDiscordIngestionSettings(settings)),
+  );
+}
+
 function normalizeRemoteConnectionDraft(draft: RemoteConnectionDraft): RemoteConnectionDraft {
   return {
     baseApiUrl: draft.baseApiUrl.trim(),
@@ -66,6 +82,17 @@ export async function loadFailoverSettings(
   }
 
   return normalizeFailoverSettings(payload);
+}
+
+export async function loadDiscordIngestionSettings(
+  storage: SecureSettingsStorage,
+): Promise<DiscordIngestionSettings | null> {
+  const payload = await readJsonRecord(storage, DISCORD_INGESTION_SETTINGS_STORAGE_KEY);
+  if (!payload) {
+    return null;
+  }
+
+  return normalizeDiscordIngestionSettings(payload);
 }
 
 async function readJsonRecord(

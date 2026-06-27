@@ -8,6 +8,7 @@ export async function hydratePersistentMobileState(
   await Promise.all([
     remoteEngineStore.getState().hydrateConnection(storage),
     useSettingsState.getState().hydrateFailoverSettings(storage),
+    useSettingsState.getState().hydrateDiscordIngestionSettings(storage),
   ]);
 }
 
@@ -17,6 +18,7 @@ export async function persistPersistentMobileState(
   await Promise.all([
     remoteEngineStore.getState().persistConnection(storage),
     useSettingsState.getState().persistFailoverSettings(storage),
+    useSettingsState.getState().persistDiscordIngestionSettings(storage),
   ]);
 }
 
@@ -34,6 +36,9 @@ export function installPersistentMobileState(
   const unsubscribeSettings = useSettingsState.subscribe((state, previousState) => {
     if (state.snapshot.failoverSettings !== previousState.snapshot.failoverSettings) {
       void state.persistFailoverSettings(storage).catch(() => undefined);
+    }
+    if (state.snapshot.discordIngestionSettings !== previousState.snapshot.discordIngestionSettings) {
+      void state.persistDiscordIngestionSettings(storage).catch(() => undefined);
     }
   });
 

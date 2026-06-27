@@ -137,8 +137,14 @@ function formatPhoneRuntimeDetail(snapshot: PhoneEngineRuntimeSnapshot, canOwnLe
   if (!snapshot.discordEngineEmbedded || !snapshot.brokerEngineEmbedded) {
     return "Native Discord and broker adapters are not embedded.";
   }
-  if (!snapshot.discordEngineReady || !snapshot.brokerEngineReady) {
+  if (!snapshot.discordEngineReady && !snapshot.brokerEngineReady) {
     return "Native Discord and broker adapters are not ready.";
+  }
+  if (!snapshot.discordEngineReady) {
+    return "Native Discord adapter is not ready.";
+  }
+  if (!snapshot.brokerEngineReady) {
+    return "Native broker adapter is not ready.";
   }
   if (!snapshot.lastHeartbeatAt) {
     return "Foreground service heartbeat missing.";

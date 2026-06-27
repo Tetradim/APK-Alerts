@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_FAILOVER_SETTINGS } from "@apk-alerts/contracts";
 import {
+  DEFAULT_DISCORD_INGESTION_SETTINGS,
+  DEFAULT_FAILOVER_SETTINGS,
+} from "@apk-alerts/contracts";
+import {
+  DISCORD_INGESTION_SETTINGS_STORAGE_KEY,
   FAILOVER_SETTINGS_STORAGE_KEY,
   type SecureSettingsStorage,
 } from "./secureSettingsPersistence.js";
@@ -34,8 +38,14 @@ test("default mobile settings summarize phone-primary Tailscale setup", () => {
   const summary = buildSettingsSummary(snapshot.failoverSettings);
 
   assert.equal(snapshot.failoverSettings.enginePriority, "phone_then_remote");
+  assert.deepEqual(snapshot.discordIngestionSettings.routePriority, [
+    "bot_engine",
+    "webview",
+    "foreground_service",
+  ]);
   assert.equal(summary.engineLabel, "Phone then Remote");
   assert.equal(summary.transportLabel, "Tailscale with cloud fallback");
+  assert.equal(summary.discordIngestionLabel, "Bot Engine -> WebView -> Foreground");
   assert.equal(summary.notificationsLabel, "Failover and offline alerts on");
 });
 
@@ -82,4 +92,29 @@ test("settings store hydrates and persists failover settings through secure stor
     JSON.parse(storage.values[FAILOVER_SETTINGS_STORAGE_KEY]).enginePriority,
     "phone_then_remote",
   );
+});
+
+test("settings store hydrates and persists discord ingestion settings through secure storage", async () => {
+  const storage = memoryStorage({
+    [DISCORD_INGESTION_SETTINGS_STORAGE_KEY]: JSON.stringify({
+      ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+      botToken: "abc",
+      routePriority: ["webview", "bot_engine", "foreground_service"],
+      botEngineEnabled: false,
+    }),
+  });
+
+  await useSettingsState.getState().hydrateDiscordIngestionSettings(storage);
+  assert.equal(useSettingsState.getState().snapshot.discordIngestionSettings.botToken, "abc");
+  assert.equal(useSettingsState.getState().snapshot.discordIngestionSettings.botEngineEnabled, false);
+
+  useSettingsState.getState().updateDiscordIngestionSettings({
+    botToken: "xyz",
+    botEngineEnabled: true,
+  });
+  await useSettingsState.getState().persistDiscordIngestionSettings(storage);
+
+  const stored = JSON.parse(storage.values[DISCORD_INGESTION_SETTINGS_STORAGE_KEY]);
+  assert.equal(stored.botToken, "xyz");
+  assert.equal(stored.botEngineEnabled, true);
 });

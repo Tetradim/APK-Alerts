@@ -1,10 +1,12 @@
 import { NativeModules, Platform } from "react-native";
 import {
   readNativePhoneEngineRuntimeStatus,
+  configureNativeDiscordIngestion as configureDiscordIngestion,
   startNativePhoneEngineRuntime as startRuntime,
   stopNativePhoneEngineRuntime as stopRuntime,
   type PhoneEngineRuntimeNativeModule,
 } from "./phoneEngineRuntimeBridge";
+import type { DiscordIngestionSettings } from "@apk-alerts/contracts";
 
 function getPhoneEngineRuntimeNativeModule(): PhoneEngineRuntimeNativeModule | null {
   if (Platform.OS !== "android") {
@@ -31,4 +33,8 @@ export function startNativePhoneEngineRuntime() {
 
 export function stopNativePhoneEngineRuntime() {
   return stopRuntime(getPhoneEngineRuntimeNativeModule());
+}
+
+export function configureNativeDiscordIngestion(settings: DiscordIngestionSettings) {
+  return configureDiscordIngestion(getPhoneEngineRuntimeNativeModule(), settings);
 }

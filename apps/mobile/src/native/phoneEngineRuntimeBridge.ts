@@ -1,4 +1,8 @@
 import {
+  normalizeDiscordIngestionSettings,
+  type DiscordIngestionSettings,
+} from "@apk-alerts/contracts";
+import {
   getDefaultPhoneEngineRuntimeSnapshot,
   type PhoneEngineRuntimeHealth,
   type PhoneEngineRuntimeSnapshot,
@@ -8,6 +12,7 @@ export interface PhoneEngineRuntimeNativeModule {
   getStatus: () => Promise<unknown>;
   start: () => Promise<unknown>;
   stop: () => Promise<unknown>;
+  configureDiscordIngestion?: (settings: DiscordIngestionSettings) => Promise<unknown>;
 }
 
 type PhoneEngineRuntimeMethod = "getStatus" | "start" | "stop";
@@ -28,6 +33,27 @@ export async function stopNativePhoneEngineRuntime(
   nativeModule: PhoneEngineRuntimeNativeModule | null | undefined,
 ): Promise<PhoneEngineRuntimeSnapshot> {
   return invokeNativePhoneEngineRuntime(nativeModule, "stop", "stop");
+}
+
+export async function configureNativeDiscordIngestion(
+  nativeModule: PhoneEngineRuntimeNativeModule | null | undefined,
+  settings: DiscordIngestionSettings,
+): Promise<PhoneEngineRuntimeSnapshot> {
+  if (!nativeModule?.configureDiscordIngestion) {
+    return unavailableSnapshot("Native Android phone engine Discord configuration is unavailable.");
+  }
+
+  try {
+    const status = await nativeModule.configureDiscordIngestion(
+      normalizeDiscordIngestionSettings(settings),
+    );
+    return normalizeNativePhoneEngineRuntimeStatus(status);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return unavailableSnapshot(
+      `Native Android phone engine Discord configuration failed: ${message || "unknown error"}`,
+    );
+  }
 }
 
 export function normalizeNativePhoneEngineRuntimeStatus(

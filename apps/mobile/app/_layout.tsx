@@ -1,19 +1,25 @@
 import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { readNativePhoneEngineRuntime } from "@/native/PhoneEngineRuntimeNative";
+import {
+  getNativePhoneEngineRuntimeModule,
+  readNativePhoneEngineRuntime,
+} from "@/native/PhoneEngineRuntimeNative";
 import { expoSecureSettingsStorage } from "@/state/expoSecureSettingsStorage";
+import { applyNativeDiscordIngestionSettings } from "@/state/nativeDiscordIngestionBridge";
 import {
   hydratePersistentMobileState,
   installPersistentMobileState,
 } from "@/state/persistentMobileState";
 import { phoneEngineRuntimeStore } from "@/state/phoneEngineRuntimeState";
+import { useSettingsState } from "@/state/settingsState";
 
 export default function RootLayout() {
   useEffect(() => {
     let active = true;
     let phoneRuntimeInterval: ReturnType<typeof setInterval> | undefined;
     let unsubscribe: (() => void) | undefined;
+    let unsubscribeNativeDiscordSettings: (() => void) | undefined;
 
     const refreshPhoneRuntime = async () => {
       const snapshot = await readNativePhoneEngineRuntime();
@@ -34,6 +40,19 @@ export default function RootLayout() {
           return;
         }
         unsubscribe = installPersistentMobileState(expoSecureSettingsStorage);
+        const syncNativeDiscordSettings = () =>
+          applyNativeDiscordIngestionSettings(
+            phoneEngineRuntimeStore,
+            useSettingsState.getState().snapshot.discordIngestionSettings,
+            getNativePhoneEngineRuntimeModule(),
+          ).catch(() => undefined);
+
+        void syncNativeDiscordSettings();
+        unsubscribeNativeDiscordSettings = useSettingsState.subscribe((state, previousState) => {
+          if (state.snapshot.discordIngestionSettings !== previousState.snapshot.discordIngestionSettings) {
+            void syncNativeDiscordSettings();
+          }
+        });
       });
 
     return () => {
@@ -42,6 +61,7 @@ export default function RootLayout() {
         clearInterval(phoneRuntimeInterval);
       }
       unsubscribe?.();
+      unsubscribeNativeDiscordSettings?.();
     };
   }, []);
 

@@ -1,5 +1,6 @@
 export type EnginePriority = "phone_then_remote" | "remote_then_phone";
 export type TransportPreference = "tailscale_first" | "cloud_first";
+export type DiscordIngestionRoute = "bot_engine" | "webview" | "foreground_service";
 
 export interface FailoverSettings {
   enginePriority: EnginePriority;
@@ -13,6 +14,20 @@ export interface FailoverSettings {
 
 export type FailoverSettingsInput = Partial<Record<keyof FailoverSettings, unknown>> | null | undefined;
 
+export interface DiscordIngestionSettings {
+  webViewEnabled: boolean;
+  botEngineEnabled: boolean;
+  foregroundServiceEnabled: boolean;
+  routePriority: DiscordIngestionRoute[];
+  botToken: string;
+  guildId: string;
+  channelAllowlist: string;
+  authorAllowlist: string;
+}
+
+export type DiscordIngestionSettingsInput =
+  Partial<Record<keyof DiscordIngestionSettings, unknown>> | null | undefined;
+
 export const DEFAULT_FAILOVER_SETTINGS: FailoverSettings = {
   enginePriority: "phone_then_remote",
   phoneEngineEnabled: true,
@@ -21,6 +36,23 @@ export const DEFAULT_FAILOVER_SETTINGS: FailoverSettings = {
   allowCloudFallback: true,
   notifyOnFailover: true,
   notifyWhenOffline: true,
+};
+
+export const DEFAULT_DISCORD_ROUTE_PRIORITY: DiscordIngestionRoute[] = [
+  "bot_engine",
+  "webview",
+  "foreground_service",
+];
+
+export const DEFAULT_DISCORD_INGESTION_SETTINGS: DiscordIngestionSettings = {
+  webViewEnabled: true,
+  botEngineEnabled: true,
+  foregroundServiceEnabled: true,
+  routePriority: DEFAULT_DISCORD_ROUTE_PRIORITY,
+  botToken: "",
+  guildId: "",
+  channelAllowlist: "",
+  authorAllowlist: "",
 };
 
 function normalizeBoolean(value: unknown, defaultValue: boolean): boolean {
@@ -41,6 +73,14 @@ function isEnginePriority(value: unknown): value is EnginePriority {
 
 function isTransportPreference(value: unknown): value is TransportPreference {
   return value === "tailscale_first" || value === "cloud_first";
+}
+
+function isDiscordIngestionRoute(value: unknown): value is DiscordIngestionRoute {
+  return value === "bot_engine" || value === "webview" || value === "foreground_service";
+}
+
+function normalizeString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export function normalizeFailoverSettings(settings: FailoverSettingsInput = {}): FailoverSettings {
@@ -110,4 +150,66 @@ export function buildTransportLabel(settings: FailoverSettingsInput = {}): strin
   }
 
   return normalizedSettings.allowCloudFallback ? "Cloud relay with Tailscale fallback" : "Cloud relay only";
+}
+
+export function normalizeDiscordIngestionSettings(
+  settings: DiscordIngestionSettingsInput = {},
+): DiscordIngestionSettings {
+  const input = settings && typeof settings === "object" ? settings : {};
+
+  return {
+    webViewEnabled: normalizeBoolean(
+      input.webViewEnabled,
+      DEFAULT_DISCORD_INGESTION_SETTINGS.webViewEnabled,
+    ),
+    botEngineEnabled: normalizeBoolean(
+      input.botEngineEnabled,
+      DEFAULT_DISCORD_INGESTION_SETTINGS.botEngineEnabled,
+    ),
+    foregroundServiceEnabled: normalizeBoolean(
+      input.foregroundServiceEnabled,
+      DEFAULT_DISCORD_INGESTION_SETTINGS.foregroundServiceEnabled,
+    ),
+    routePriority: normalizeDiscordRoutePriority(input.routePriority),
+    botToken: normalizeString(input.botToken),
+    guildId: normalizeString(input.guildId),
+    channelAllowlist: normalizeString(input.channelAllowlist),
+    authorAllowlist: normalizeString(input.authorAllowlist),
+  };
+}
+
+export function buildDiscordIngestionPriorityLabel(
+  settings: DiscordIngestionSettingsInput = {},
+): string {
+  return normalizeDiscordIngestionSettings(settings).routePriority.map(discordRouteLabel).join(" -> ");
+}
+
+function normalizeDiscordRoutePriority(value: unknown): DiscordIngestionRoute[] {
+  const orderedRoutes: DiscordIngestionRoute[] = [];
+  const inputRoutes = Array.isArray(value) ? value : DEFAULT_DISCORD_ROUTE_PRIORITY;
+
+  for (const route of inputRoutes) {
+    if (isDiscordIngestionRoute(route) && !orderedRoutes.includes(route)) {
+      orderedRoutes.push(route);
+    }
+  }
+
+  for (const route of DEFAULT_DISCORD_ROUTE_PRIORITY) {
+    if (!orderedRoutes.includes(route)) {
+      orderedRoutes.push(route);
+    }
+  }
+
+  return orderedRoutes;
+}
+
+function discordRouteLabel(route: DiscordIngestionRoute): string {
+  switch (route) {
+    case "bot_engine":
+      return "Bot Engine";
+    case "webview":
+      return "WebView";
+    case "foreground_service":
+      return "Foreground";
+  }
 }

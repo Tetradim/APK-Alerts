@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_FAILOVER_SETTINGS,
+  DEFAULT_DISCORD_INGESTION_SETTINGS,
+  buildDiscordIngestionPriorityLabel,
   buildEnginePriorityLabel,
   buildTransportLabel,
   canAnyEngineRun,
+  normalizeDiscordIngestionSettings,
   normalizeFailoverSettings,
 } from "./index.js";
 
@@ -114,4 +117,42 @@ test("invalid transport preference normalizes to Tailscale and labels Tailscale"
 
   assert.equal(normalizeFailoverSettings(settings).transportPreference, "tailscale_first");
   assert.equal(buildTransportLabel(settings), "Tailscale with cloud fallback");
+});
+
+test("default discord ingestion settings enable all local routes with bot engine first", () => {
+  assert.deepEqual(DEFAULT_DISCORD_INGESTION_SETTINGS.routePriority, [
+    "bot_engine",
+    "webview",
+    "foreground_service",
+  ]);
+  assert.equal(DEFAULT_DISCORD_INGESTION_SETTINGS.webViewEnabled, true);
+  assert.equal(DEFAULT_DISCORD_INGESTION_SETTINGS.botEngineEnabled, true);
+  assert.equal(DEFAULT_DISCORD_INGESTION_SETTINGS.foregroundServiceEnabled, true);
+  assert.equal(
+    buildDiscordIngestionPriorityLabel(DEFAULT_DISCORD_INGESTION_SETTINGS),
+    "Bot Engine -> WebView -> Foreground",
+  );
+});
+
+test("discord ingestion settings normalize malformed route priorities and token fields", () => {
+  const settings = normalizeDiscordIngestionSettings({
+    botToken: " token ",
+    guildId: " guild ",
+    channelAllowlist: " 111, 222 ",
+    authorAllowlist: " bot-a ",
+    routePriority: ["webview", "webview", "bad-route"],
+    webViewEnabled: "yes",
+    botEngineEnabled: false,
+    foregroundServiceEnabled: false,
+  });
+
+  assert.equal(settings.botToken, "token");
+  assert.equal(settings.guildId, "guild");
+  assert.equal(settings.channelAllowlist, "111, 222");
+  assert.equal(settings.authorAllowlist, "bot-a");
+  assert.deepEqual(settings.routePriority, ["webview", "bot_engine", "foreground_service"]);
+  assert.equal(settings.webViewEnabled, true);
+  assert.equal(settings.botEngineEnabled, false);
+  assert.equal(settings.foregroundServiceEnabled, false);
+  assert.equal(buildDiscordIngestionPriorityLabel(settings), "WebView -> Bot Engine -> Foreground");
 });

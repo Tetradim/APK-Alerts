@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  configureNativeDiscordIngestion,
   readNativePhoneEngineRuntimeStatus,
   startNativePhoneEngineRuntime,
   stopNativePhoneEngineRuntime,
@@ -33,6 +34,7 @@ test("native phone engine bridge normalizes healthy foreground service status", 
     }),
     start: async () => ({}),
     stop: async () => ({}),
+    configureDiscordIngestion: async () => ({}),
   });
 
   assert.equal(snapshot.nativeRuntimeAvailable, true);
@@ -68,6 +70,7 @@ test("native phone engine bridge propagates start and stop status", async () => 
         blockingReason: "Native Discord and broker adapters are embedded but not configured.",
       };
     },
+    configureDiscordIngestion: async () => ({}),
     stop: async () => {
       calls.push("stop");
       return {
@@ -108,4 +111,51 @@ test("native phone engine bridge fails closed when Android module throws", async
   assert.equal(snapshot.nativeRuntimeAvailable, false);
   assert.equal(snapshot.health, "offline");
   assert.equal(snapshot.blockingReason, "Native Android phone engine status check failed: binder unavailable");
+});
+
+test("native phone engine bridge sends discord ingestion settings to Android module", async () => {
+  const received: unknown[] = [];
+  const snapshot = await configureNativeDiscordIngestion({
+    getStatus: async () => ({}),
+    start: async () => ({}),
+    stop: async () => ({}),
+    configureDiscordIngestion: async (settings) => {
+      received.push(settings);
+      return {
+        nativeRuntimeAvailable: true,
+        serviceEnabled: true,
+        foregroundServiceActive: true,
+        discordEngineEmbedded: true,
+        brokerEngineEmbedded: true,
+        discordEngineReady: true,
+        brokerEngineReady: false,
+        liveExecutionArmed: false,
+        health: "degraded",
+        lastHeartbeatAt: "2026-06-27T19:00:00.000Z",
+        blockingReason: "Broker adapter is not ready.",
+      };
+    },
+  }, {
+    webViewEnabled: true,
+    botEngineEnabled: true,
+    foregroundServiceEnabled: true,
+    routePriority: ["webview", "bot_engine", "foreground_service"],
+    botToken: " token ",
+    guildId: " guild ",
+    channelAllowlist: " 111 ",
+    authorAllowlist: " 222 ",
+  });
+
+  assert.deepEqual(received, [{
+    webViewEnabled: true,
+    botEngineEnabled: true,
+    foregroundServiceEnabled: true,
+    routePriority: ["webview", "bot_engine", "foreground_service"],
+    botToken: "token",
+    guildId: "guild",
+    channelAllowlist: "111",
+    authorAllowlist: "222",
+  }]);
+  assert.equal(snapshot.discordEngineReady, true);
+  assert.equal(snapshot.health, "degraded");
 });

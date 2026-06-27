@@ -33,6 +33,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Cockpit", tabBarIcon: tabIcon("view-dashboard-outline") }} />
       <Tabs.Screen name="alerts" options={{ title: "Alerts", tabBarIcon: tabIcon("bell-outline") }} />
+      <Tabs.Screen name="discord" options={{ title: "Discord", tabBarIcon: tabIcon("message-text-outline") }} />
       <Tabs.Screen name="positions" options={{ title: "Positions", tabBarIcon: tabIcon("chart-line") }} />
       <Tabs.Screen name="engines" options={{ title: "Engines", tabBarIcon: tabIcon("server-network") }} />
       <Tabs.Screen name="settings" options={{ title: "Settings", tabBarIcon: tabIcon("cog-outline") }} />

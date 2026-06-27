@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_FAILOVER_SETTINGS } from "@apk-alerts/contracts";
 import {
+  DEFAULT_DISCORD_INGESTION_SETTINGS,
+  DEFAULT_FAILOVER_SETTINGS,
+} from "@apk-alerts/contracts";
+import {
+  DISCORD_INGESTION_SETTINGS_STORAGE_KEY,
   FAILOVER_SETTINGS_STORAGE_KEY,
   REMOTE_CONNECTION_STORAGE_KEY,
+  loadDiscordIngestionSettings,
   loadFailoverSettings,
   loadRemoteConnection,
+  saveDiscordIngestionSettings,
   saveFailoverSettings,
   saveRemoteConnection,
   type SecureSettingsStorage,
@@ -66,4 +72,21 @@ test("secure persistence saves and normalizes failover settings", async () => {
   assert.equal(loaded?.notifyWhenOffline, false);
   assert.equal(loaded?.phoneEngineEnabled, true);
   assert.equal(storage.values[FAILOVER_SETTINGS_STORAGE_KEY].includes("remote_then_phone"), true);
+});
+
+test("secure persistence saves and normalizes discord ingestion settings including token", async () => {
+  const storage = memoryStorage();
+
+  await saveDiscordIngestionSettings(storage, {
+    ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+    botToken: " bot-token ",
+    routePriority: ["webview", "bot_engine", "foreground_service"],
+    foregroundServiceEnabled: false,
+  });
+  const loaded = await loadDiscordIngestionSettings(storage);
+
+  assert.equal(loaded?.botToken, "bot-token");
+  assert.deepEqual(loaded?.routePriority, ["webview", "bot_engine", "foreground_service"]);
+  assert.equal(loaded?.foregroundServiceEnabled, false);
+  assert.equal(JSON.parse(storage.values[DISCORD_INGESTION_SETTINGS_STORAGE_KEY]).botToken, "bot-token");
 });

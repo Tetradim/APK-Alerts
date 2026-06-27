@@ -1,5 +1,5 @@
-import type { EnginePriority, TransportPreference } from "@apk-alerts/contracts";
-import { StyleSheet, Text, View } from "react-native";
+import type { DiscordIngestionRoute, EnginePriority, TransportPreference } from "@apk-alerts/contracts";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { SegmentedChoice } from "@/components/SegmentedChoice";
 import { SettingRow } from "@/components/SettingRow";
@@ -15,10 +15,52 @@ const transportOptions = [
   { label: "Cloud first", value: "cloud_first" },
 ] as const;
 
+type DiscordPriorityPreset =
+  | "bot_web_foreground"
+  | "web_bot_foreground"
+  | "web_foreground_bot"
+  | "foreground_bot_web";
+
+const discordPriorityOptions = [
+  { label: "Bot/Web/FG", value: "bot_web_foreground" },
+  { label: "Web/Bot/FG", value: "web_bot_foreground" },
+  { label: "Web/FG/Bot", value: "web_foreground_bot" },
+  { label: "FG/Bot/Web", value: "foreground_bot_web" },
+] as const;
+
+function routePriorityForPreset(preset: DiscordPriorityPreset): DiscordIngestionRoute[] {
+  switch (preset) {
+    case "bot_web_foreground":
+      return ["bot_engine", "webview", "foreground_service"];
+    case "web_bot_foreground":
+      return ["webview", "bot_engine", "foreground_service"];
+    case "web_foreground_bot":
+      return ["webview", "foreground_service", "bot_engine"];
+    case "foreground_bot_web":
+      return ["foreground_service", "bot_engine", "webview"];
+  }
+}
+
+function presetForRoutePriority(priority: DiscordIngestionRoute[]): DiscordPriorityPreset {
+  const key = priority.join(",");
+  switch (key) {
+    case "webview,bot_engine,foreground_service":
+      return "web_bot_foreground";
+    case "webview,foreground_service,bot_engine":
+      return "web_foreground_bot";
+    case "foreground_service,bot_engine,webview":
+      return "foreground_bot_web";
+    default:
+      return "bot_web_foreground";
+  }
+}
+
 export function SettingsScreen() {
   const failoverSettings = useSettingsState((state) => state.snapshot.failoverSettings);
+  const discordIngestionSettings = useSettingsState((state) => state.snapshot.discordIngestionSettings);
   const updateFailoverSettings = useSettingsState((state) => state.updateFailoverSettings);
-  const summary = buildSettingsSummary(failoverSettings);
+  const updateDiscordIngestionSettings = useSettingsState((state) => state.updateDiscordIngestionSettings);
+  const summary = buildSettingsSummary(failoverSettings, discordIngestionSettings);
 
   return (
     <ScreenFrame title="Settings" eyebrow="APK-Alerts">
@@ -26,6 +68,7 @@ export function SettingsScreen() {
         <Text style={styles.summaryLabel}>Current failover policy</Text>
         <Text style={styles.summaryValue}>{summary.engineLabel}</Text>
         <Text style={styles.summaryDetail}>{summary.transportLabel}</Text>
+        <Text style={styles.summaryDetail}>{summary.discordIngestionLabel}</Text>
         <Text style={styles.summaryDetail}>{summary.notificationsLabel}</Text>
       </View>
 
@@ -82,6 +125,83 @@ export function SettingsScreen() {
           onValueChange={(notifyWhenOffline) => updateFailoverSettings({ notifyWhenOffline })}
         />
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Discord Ingestion</Text>
+        <SegmentedChoice<DiscordPriorityPreset>
+          label="Failure order"
+          value={presetForRoutePriority(discordIngestionSettings.routePriority)}
+          options={discordPriorityOptions}
+          onChange={(preset) =>
+            updateDiscordIngestionSettings({ routePriority: routePriorityForPreset(preset) })
+          }
+        />
+        <SettingRow
+          label="Embedded Bot Engine"
+          description="Run a Discord bot Gateway worker inside the Android foreground service."
+          value={discordIngestionSettings.botEngineEnabled}
+          onValueChange={(botEngineEnabled) => updateDiscordIngestionSettings({ botEngineEnabled })}
+        />
+        <SettingRow
+          label="Discord WebView"
+          description="Show Discord inside the app as a persistent WebView tab."
+          value={discordIngestionSettings.webViewEnabled}
+          onValueChange={(webViewEnabled) => updateDiscordIngestionSettings({ webViewEnabled })}
+        />
+        <SettingRow
+          label="Foreground Keepalive"
+          description="Keep Mobile Consolidation active with an Android foreground notification."
+          value={discordIngestionSettings.foregroundServiceEnabled}
+          onValueChange={(foregroundServiceEnabled) =>
+            updateDiscordIngestionSettings({ foregroundServiceEnabled })
+          }
+        />
+        <Text style={styles.fieldLabel}>Bot token</Text>
+        <TextInput
+          value={discordIngestionSettings.botToken}
+          onChangeText={(botToken) => updateDiscordIngestionSettings({ botToken })}
+          placeholder="Discord bot token"
+          placeholderTextColor="#94a3b8"
+          accessibilityLabel="Discord bot token"
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          style={styles.input}
+        />
+        <Text style={styles.fieldLabel}>Guild ID</Text>
+        <TextInput
+          value={discordIngestionSettings.guildId}
+          onChangeText={(guildId) => updateDiscordIngestionSettings({ guildId })}
+          placeholder="Optional guild/server ID"
+          placeholderTextColor="#94a3b8"
+          accessibilityLabel="Discord guild ID"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <Text style={styles.fieldLabel}>Channel allowlist</Text>
+        <TextInput
+          value={discordIngestionSettings.channelAllowlist}
+          onChangeText={(channelAllowlist) => updateDiscordIngestionSettings({ channelAllowlist })}
+          placeholder="Comma-separated channel IDs"
+          placeholderTextColor="#94a3b8"
+          accessibilityLabel="Discord channel allowlist"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <Text style={styles.fieldLabel}>Author allowlist</Text>
+        <TextInput
+          value={discordIngestionSettings.authorAllowlist}
+          onChangeText={(authorAllowlist) => updateDiscordIngestionSettings({ authorAllowlist })}
+          placeholder="Comma-separated author IDs"
+          placeholderTextColor="#94a3b8"
+          accessibilityLabel="Discord author allowlist"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+      </View>
     </ScreenFrame>
   );
 }
@@ -116,6 +236,7 @@ const styles = StyleSheet.create({
     borderColor: "#334155",
     borderRadius: 8,
     borderWidth: 1,
+    gap: 10,
     padding: 14,
   },
   sectionTitle: {
@@ -123,5 +244,20 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "900",
     marginBottom: 12,
+  },
+  fieldLabel: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  input: {
+    backgroundColor: "#020617",
+    borderColor: "#334155",
+    borderRadius: 8,
+    borderWidth: 1,
+    color: "#f8fafc",
+    fontSize: 15,
+    minHeight: 48,
+    paddingHorizontal: 12,
   },
 });

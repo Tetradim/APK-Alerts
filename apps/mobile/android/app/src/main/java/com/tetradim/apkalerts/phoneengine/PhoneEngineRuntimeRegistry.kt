@@ -14,6 +14,14 @@ object PhoneEngineRuntimeRegistry {
   private const val KEY_DISCORD_ENGINE_READY = "discord_engine_ready"
   private const val KEY_BROKER_ENGINE_READY = "broker_engine_ready"
   private const val KEY_LIVE_EXECUTION_ARMED = "live_execution_armed"
+  private const val KEY_DISCORD_BOT_TOKEN = "discord_bot_token"
+  private const val KEY_DISCORD_BOT_ENABLED = "discord_bot_enabled"
+  private const val KEY_DISCORD_WEBVIEW_ENABLED = "discord_webview_enabled"
+  private const val KEY_FOREGROUND_KEEPALIVE_ENABLED = "foreground_keepalive_enabled"
+  private const val KEY_DISCORD_ROUTE_PRIORITY = "discord_route_priority"
+  private const val KEY_DISCORD_GUILD_ID = "discord_guild_id"
+  private const val KEY_DISCORD_CHANNEL_ALLOWLIST = "discord_channel_allowlist"
+  private const val KEY_DISCORD_AUTHOR_ALLOWLIST = "discord_author_allowlist"
 
   private val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")
@@ -27,6 +35,9 @@ object PhoneEngineRuntimeRegistry {
   private var discordEngineReady = false
   private var brokerEngineReady = false
   private var liveExecutionArmed = false
+  private var discordGatewayReady = false
+  private var discordGatewayStatus = "not_started"
+  private var discordLastGatewayEventAt = ""
   private var health = "offline"
   private var lastHeartbeatAt = ""
   private var blockingReason = "Foreground service stopped."
@@ -51,7 +62,33 @@ object PhoneEngineRuntimeRegistry {
 
   @Synchronized
   fun shouldRestartAfterBoot(context: Context): Boolean {
-    return preferences(context).getBoolean(KEY_SERVICE_ENABLED, false)
+    return preferences(context).getBoolean(KEY_SERVICE_ENABLED, false) &&
+      preferences(context).getBoolean(KEY_FOREGROUND_KEEPALIVE_ENABLED, true)
+  }
+
+  @Synchronized
+  fun configureDiscordIngestion(
+    context: Context,
+    botToken: String,
+    guildId: String,
+    channelAllowlist: String,
+    authorAllowlist: String,
+    webViewEnabled: Boolean,
+    botEngineEnabled: Boolean,
+    foregroundKeepaliveEnabled: Boolean,
+    routePriority: String,
+  ) {
+    preferences(context).edit()
+      .putString(KEY_DISCORD_BOT_TOKEN, botToken.trim())
+      .putString(KEY_DISCORD_GUILD_ID, guildId.trim())
+      .putString(KEY_DISCORD_CHANNEL_ALLOWLIST, channelAllowlist.trim())
+      .putString(KEY_DISCORD_AUTHOR_ALLOWLIST, authorAllowlist.trim())
+      .putBoolean(KEY_DISCORD_WEBVIEW_ENABLED, webViewEnabled)
+      .putBoolean(KEY_DISCORD_BOT_ENABLED, botEngineEnabled)
+      .putBoolean(KEY_FOREGROUND_KEEPALIVE_ENABLED, foregroundKeepaliveEnabled)
+      .putString(KEY_DISCORD_ROUTE_PRIORITY, routePriority)
+      .apply()
+    refreshAdapterState(context)
   }
 
   @Synchronized
@@ -78,8 +115,12 @@ object PhoneEngineRuntimeRegistry {
     health = if (adaptersReady) "healthy" else "degraded"
     blockingReason = if (adaptersReady) {
       ""
+    } else if (!discordEngineReady && !brokerEngineReady) {
+      "Native Discord and broker adapters are not ready."
+    } else if (!discordEngineReady) {
+      "Native Discord adapter is not ready."
     } else {
-      "Native Discord and broker adapters are embedded but not configured."
+      "Native broker adapter is not ready."
     }
   }
 
@@ -91,6 +132,41 @@ object PhoneEngineRuntimeRegistry {
     refreshAdapterState(context)
     health = "offline"
     blockingReason = "Foreground service stopped."
+  }
+
+  @Synchronized
+  fun markDiscordGatewayState(context: Context, ready: Boolean, status: String, hasEvent: Boolean = false) {
+    discordGatewayReady = ready
+    discordGatewayStatus = status
+    if (hasEvent) {
+      discordLastGatewayEventAt = nowIso()
+    }
+    refreshAdapterState(context)
+  }
+
+  @Synchronized
+  fun discordBotToken(context: Context): String {
+    return preferences(context).getString(KEY_DISCORD_BOT_TOKEN, "")?.trim().orEmpty()
+  }
+
+  @Synchronized
+  fun discordBotEnabled(context: Context): Boolean {
+    return preferences(context).getBoolean(KEY_DISCORD_BOT_ENABLED, true)
+  }
+
+  @Synchronized
+  fun discordGuildId(context: Context): String {
+    return preferences(context).getString(KEY_DISCORD_GUILD_ID, "")?.trim().orEmpty()
+  }
+
+  @Synchronized
+  fun discordChannelAllowlist(context: Context): Set<String> {
+    return csvSet(preferences(context).getString(KEY_DISCORD_CHANNEL_ALLOWLIST, "").orEmpty())
+  }
+
+  @Synchronized
+  fun discordAuthorAllowlist(context: Context): Set<String> {
+    return csvSet(preferences(context).getString(KEY_DISCORD_AUTHOR_ALLOWLIST, "").orEmpty())
   }
 
   @Synchronized
@@ -113,7 +189,14 @@ object PhoneEngineRuntimeRegistry {
 
   private fun refreshAdapterState(context: Context) {
     val preferences = preferences(context)
-    discordEngineReady = preferences.getBoolean(KEY_DISCORD_ENGINE_READY, false)
+    val botEnabled = preferences.getBoolean(KEY_DISCORD_BOT_ENABLED, true)
+    val botTokenPresent = preferences.getString(KEY_DISCORD_BOT_TOKEN, "")?.trim()?.isNotEmpty() == true
+    val webViewEnabled = preferences.getBoolean(KEY_DISCORD_WEBVIEW_ENABLED, true)
+    val foregroundEnabled = preferences.getBoolean(KEY_FOREGROUND_KEEPALIVE_ENABLED, true)
+    discordEngineReady = preferences.getBoolean(KEY_DISCORD_ENGINE_READY, false) ||
+      (botEnabled && botTokenPresent && discordGatewayReady) ||
+      webViewEnabled ||
+      foregroundEnabled
     brokerEngineReady = preferences.getBoolean(KEY_BROKER_ENGINE_READY, false)
     liveExecutionArmed = preferences.getBoolean(KEY_LIVE_EXECUTION_ARMED, false)
   }
@@ -124,4 +207,10 @@ object PhoneEngineRuntimeRegistry {
   private fun nowIso(): String = synchronized(isoFormatter) {
     isoFormatter.format(Date())
   }
+
+  private fun csvSet(value: String): Set<String> =
+    value.split(",")
+      .map { it.trim() }
+      .filter { it.isNotEmpty() }
+      .toSet()
 }
