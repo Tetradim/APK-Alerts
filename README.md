@@ -9,6 +9,7 @@ The foundation slice includes:
 - local append-only event log with duplicate idempotency-key protection;
 - Expo mobile shell;
 - operator cockpit as the first screen;
+- failover settings for engine priority, engine enablement, transport preference, and phone alerts;
 - Alerts, Positions, Engines, Settings, and More tabs;
 - no mobile Lab tab;
 - no fake trading data.
