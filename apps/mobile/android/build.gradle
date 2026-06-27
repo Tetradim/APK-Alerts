@@ -20,5 +20,26 @@ allprojects {
   }
 }
 
+def androidCxxRuntimeLibraries = "-DCMAKE_CXX_STANDARD_LIBRARIES=-lc++_shared -latomic -lm"
+
+def configureAndroidCxxRuntime = { androidProject ->
+  androidProject.extensions.configure("android") { androidExt ->
+    androidExt.defaultConfig.externalNativeBuild {
+      cmake {
+        arguments androidCxxRuntimeLibraries
+      }
+    }
+  }
+}
+
+subprojects { subproject ->
+  subproject.plugins.withId("com.android.application") {
+    configureAndroidCxxRuntime(subproject)
+  }
+  subproject.plugins.withId("com.android.library") {
+    configureAndroidCxxRuntime(subproject)
+  }
+}
+
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
