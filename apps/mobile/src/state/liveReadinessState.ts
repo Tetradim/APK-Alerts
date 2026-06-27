@@ -221,6 +221,7 @@ export function buildLiveArmChecklistSummary(snapshot: LiveReadinessSnapshot): L
   const exits = buildExitProtectionEvidenceSummary(snapshot);
   const brokerCapabilities = checks.broker.capabilities;
   const brokerReady =
+    checks.broker.activeBroker !== "unknown" &&
     checks.broker.configured &&
     checks.broker.connected &&
     brokerCapabilities.supportsLiveTrading &&
@@ -228,11 +229,18 @@ export function buildLiveArmChecklistSummary(snapshot: LiveReadinessSnapshot): L
     brokerCapabilities.supportsOrderStatus &&
     brokerCapabilities.supportsCancelOrder &&
     checks.broker.missingRequiredFields.length === 0;
-  const sourceReady = checks.sourcePolicy.valid && checks.sourcePolicy.autoLiveSources > 0;
-  const ingestionReady = checks.signalIngestion.discordConnected || checks.signalIngestion.chromeBridgeHealthy;
+  const sourceReady =
+    checks.sourcePolicy.valid &&
+    checks.sourcePolicy.autoLiveSources > 0 &&
+    checks.sourcePolicy.enabledSources > 0;
+  const ingestionReady =
+    checks.signalIngestion.discordConfigured &&
+    checks.signalIngestion.discordChannelCount > 0 &&
+    (checks.signalIngestion.discordConnected || checks.signalIngestion.chromeBridgeHealthy);
   const tradingReady =
     checks.trading.autoTradingEnabled &&
     !checks.trading.simulationMode &&
+    checks.trading.maxPositionSize !== null &&
     checks.trading.maxPositionSizeValid;
   const runtimeReady = !checks.runtime.shutdownTriggered && checks.runtime.liveTradingArmed;
   const endpointReady =

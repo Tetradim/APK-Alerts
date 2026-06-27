@@ -119,6 +119,64 @@ test("endpoint-ready but unarmed payload cannot claim live-money readiness", () 
   assert.equal(canClaimLiveReady(readiness), false);
 });
 
+test("live-ready claim fails closed when hidden required evidence is missing", () => {
+  const variants = [
+    {
+      name: "unknown broker",
+      checks: { broker: { ...readyPayload.checks.broker, active_broker: "unknown" } },
+    },
+    {
+      name: "missing broker fields",
+      checks: { broker: { ...readyPayload.checks.broker, missing_required_fields: ["api_secret"] } },
+    },
+    {
+      name: "no enabled sources",
+      checks: { source_policy: { ...readyPayload.checks.source_policy, enabled_sources: 0 } },
+    },
+    {
+      name: "unconfigured discord ingestion",
+      checks: {
+        signal_ingestion: {
+          ...readyPayload.checks.signal_ingestion,
+          discord_configured: false,
+          discord_channel_count: 0,
+        },
+      },
+    },
+    {
+      name: "missing max position value",
+      checks: { trading: { ...readyPayload.checks.trading, max_position_size: null } },
+    },
+    {
+      name: "unprotected position ids",
+      checks: {
+        exit_automation: {
+          ...readyPayload.checks.exit_automation,
+          unprotected_open_position_ids: ["pos-1"],
+        },
+      },
+    },
+    {
+      name: "metadata-only position ids",
+      checks: {
+        exit_automation: {
+          ...readyPayload.checks.exit_automation,
+          metadata_only_open_position_ids: ["pos-2"],
+        },
+      },
+    },
+  ];
+
+  for (const variant of variants) {
+    const readiness = normalizeLiveReadinessPayload({
+      ...readyPayload,
+      checks: { ...readyPayload.checks, ...variant.checks },
+    });
+    assert.equal(readiness.readyForLive, true, variant.name);
+    assert.equal(canClaimLiveReady(readiness), false, variant.name);
+  }
+});
+
 test("blocking issues and failed replay remain visible and block readiness", () => {
   const readiness = normalizeLiveReadinessPayload({
     ...readyPayload,

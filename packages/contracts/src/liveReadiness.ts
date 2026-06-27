@@ -135,23 +135,31 @@ export function canClaimLiveReady(readiness: LiveReadiness): boolean {
     (checks.apiAuth.configured || checks.apiAuth.authlessDesktopMode) &&
     checks.credentialKey.configured &&
     checks.credentialKey.valid &&
+    checks.broker.activeBroker !== "unknown" &&
     checks.broker.configured &&
     checks.broker.connected &&
+    checks.broker.missingRequiredFields.length === 0 &&
     checks.broker.capabilities.supportsLiveTrading &&
     checks.broker.capabilities.supportsOptions &&
     checks.broker.capabilities.supportsOrderStatus &&
     checks.broker.capabilities.supportsCancelOrder &&
     checks.sourcePolicy.valid &&
     checks.sourcePolicy.autoLiveSources > 0 &&
+    checks.sourcePolicy.enabledSources > 0 &&
+    checks.signalIngestion.discordConfigured &&
+    checks.signalIngestion.discordChannelCount > 0 &&
     (checks.signalIngestion.discordConnected || checks.signalIngestion.chromeBridgeHealthy) &&
     checks.trading.autoTradingEnabled &&
     !checks.trading.simulationMode &&
+    checks.trading.maxPositionSize !== null &&
     checks.trading.maxPositionSizeValid &&
     checks.exitAutomation.ocoExitsConfigured &&
     checks.exitAutomation.brokerOrderStatusSupported &&
     checks.exitAutomation.brokerCancelSupported &&
     checks.exitAutomation.unprotectedOpenPositionCount === 0 &&
+    checks.exitAutomation.unprotectedOpenPositionIds.length === 0 &&
     checks.exitAutomation.metadataOnlyOpenPositionCount === 0 &&
+    checks.exitAutomation.metadataOnlyOpenPositionIds.length === 0 &&
     !checks.runtime.shutdownTriggered &&
     checks.runtime.liveTradingArmed &&
     checks.reconciliation.unresolvedCount === 0 &&

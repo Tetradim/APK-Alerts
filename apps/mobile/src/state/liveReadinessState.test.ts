@@ -390,6 +390,52 @@ test("live arm checklist exposes broker source credential and ingestion blockers
   assert.equal(summary.items.find((item) => item.key === "ingestion")?.statusLabel, "Live ingestion blocked");
 });
 
+test("live arm checklist blocks hidden missing broker source ingestion trading and OCO evidence", () => {
+  const hiddenEvidencePayload = {
+    ...readyPayload,
+    checks: {
+      ...readyPayload.checks,
+      broker: {
+        ...readyPayload.checks.broker,
+        active_broker: "unknown",
+        missing_required_fields: ["api_secret"],
+      },
+      source_policy: {
+        ...readyPayload.checks.source_policy,
+        enabled_sources: 0,
+      },
+      signal_ingestion: {
+        ...readyPayload.checks.signal_ingestion,
+        discord_configured: false,
+        discord_channel_count: 0,
+      },
+      trading: {
+        ...readyPayload.checks.trading,
+        max_position_size: null,
+      },
+      exit_automation: {
+        ...readyPayload.checks.exit_automation,
+        unprotected_open_position_ids: ["pos-1"],
+      },
+    },
+  };
+  const summary = buildLiveArmChecklistSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: {
+      checkedAt: "2026-06-27T17:25:00.000Z",
+      readiness: normalizeLiveReadinessPayload(hiddenEvidencePayload),
+      liveMoneyReady: false,
+    },
+  });
+
+  assert.equal(summary.gateLabel, "Live checklist blocked");
+  assert.equal(summary.items.find((item) => item.key === "broker")?.statusLabel, "Broker blocked");
+  assert.equal(summary.items.find((item) => item.key === "source")?.statusLabel, "Source policy blocked");
+  assert.equal(summary.items.find((item) => item.key === "ingestion")?.statusLabel, "Live ingestion blocked");
+  assert.equal(summary.items.find((item) => item.key === "trading")?.statusLabel, "Trading controls blocked");
+  assert.equal(summary.items.find((item) => item.key === "exits")?.statusLabel, "OCO exits blocking");
+});
+
 test("live-readiness store refreshes and clears stale readiness on connection edit", async () => {
   const checker: LiveReadinessChecker = async (config) => {
     assert.equal(config.baseApiUrl, "http://100.90.10.11:8001/api");
