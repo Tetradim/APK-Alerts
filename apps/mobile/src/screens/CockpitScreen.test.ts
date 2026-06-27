@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_FAILOVER_SETTINGS } from "@apk-alerts/contracts";
 import {
+  buildEngineCommunicationProofSummary,
   buildCockpitSummary,
   NOT_PAIRED_OPERATOR_SNAPSHOT,
   type OperatorSnapshot,
@@ -35,6 +36,61 @@ test("phone-owned healthy cockpit summary shows remote dormant", () => {
   assert.equal(summary.remoteLabel, "Dormant");
   assert.equal(summary.leaseLabel, "Lease held");
   assert.equal(summary.canExecute, true);
+});
+
+test("engine communication proof clears when health lease transport and sync agree", () => {
+  const summary = buildEngineCommunicationProofSummary(EXECUTABLE_PHONE_SNAPSHOT);
+
+  assert.equal(summary.gateLabel, "Communication clear");
+  assert.equal(summary.readyCountLabel, "5/5 proof(s) clear");
+  assert.equal(summary.blockingCountLabel, "No communication blockers");
+  assert.equal(summary.blocking, false);
+  assert.equal(summary.items.find((item) => item.key === "phone_health")?.statusLabel, "Phone healthy");
+  assert.equal(summary.items.find((item) => item.key === "remote_health")?.statusLabel, "Remote reachable");
+  assert.equal(summary.items.find((item) => item.key === "lease")?.statusLabel, "Lease matches Phone Engine");
+  assert.equal(summary.items.find((item) => item.key === "transport")?.statusLabel, "Transport connected");
+  assert.equal(summary.items.find((item) => item.key === "sync")?.statusLabel, "Event log synced");
+});
+
+test("engine communication proof blocks stale sync evidence", () => {
+  const summary = buildEngineCommunicationProofSummary({
+    ...EXECUTABLE_PHONE_SNAPSHOT,
+    syncStatus: "stale",
+    lastSyncLabel: "4m ago",
+  });
+
+  assert.equal(summary.gateLabel, "Communication blocked");
+  assert.equal(summary.readyCountLabel, "4/5 proof(s) clear");
+  assert.equal(summary.blockingCountLabel, "1 communication blocker(s)");
+  assert.equal(summary.blocking, true);
+  assert.equal(summary.items.find((item) => item.key === "sync")?.statusLabel, "Event log not synced");
+  assert.equal(summary.items.find((item) => item.key === "sync")?.detailLabel, "stale - 4m ago");
+});
+
+test("engine communication proof blocks lease holder mismatch", () => {
+  const summary = buildEngineCommunicationProofSummary({
+    ...EXECUTABLE_PHONE_SNAPSHOT,
+    activeEngine: "remote",
+    leaseState: "phone_held",
+  });
+
+  assert.equal(summary.gateLabel, "Communication blocked");
+  assert.equal(summary.items.find((item) => item.key === "lease")?.statusLabel, "Lease mismatch");
+  assert.equal(summary.items.find((item) => item.key === "lease")?.detailLabel, "Phone lease but active engine is Remote Engine");
+  assert.equal(summary.blocking, true);
+});
+
+test("missing transport blocks communication proof and cockpit execution", () => {
+  const snapshot = {
+    ...EXECUTABLE_PHONE_SNAPSHOT,
+    transport: "none",
+  } satisfies OperatorSnapshot;
+  const communication = buildEngineCommunicationProofSummary(snapshot);
+  const cockpit = buildCockpitSummary(snapshot);
+
+  assert.equal(communication.items.find((item) => item.key === "transport")?.statusLabel, "Transport missing");
+  assert.equal(communication.blocking, true);
+  assert.equal(cockpit.canExecute, false);
 });
 
 test("cockpit summary can include configured failover policy", () => {

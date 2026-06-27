@@ -2,13 +2,22 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
-import { buildCockpitSummary, useOperatorState } from "@/state/operatorState";
+import {
+  buildCockpitSummary,
+  buildEngineCommunicationProofSummary,
+  useOperatorState,
+} from "@/state/operatorState";
 import { useSettingsState } from "@/state/settingsState";
+
+function communicationTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
+}
 
 export function CockpitScreen() {
   const snapshot = useOperatorState((state) => state.snapshot);
   const failoverSettings = useSettingsState((state) => state.snapshot.failoverSettings);
   const summary = buildCockpitSummary(snapshot, failoverSettings);
+  const communicationProof = buildEngineCommunicationProofSummary(snapshot);
 
   return (
     <ScreenFrame title="Operator Cockpit" eyebrow="APK-Alerts">
@@ -58,6 +67,29 @@ export function CockpitScreen() {
         <Text style={styles.policyDetail}>{summary.transportPolicyLabel}</Text>
       </View>
 
+      <View style={styles.policyPanel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.panelCopy}>
+            <Text style={styles.policyLabel}>Communication proof</Text>
+            <Text style={styles.policyValue}>{communicationProof.readyCountLabel}</Text>
+          </View>
+          <StatusPill
+            label={communicationProof.gateLabel}
+            tone={communicationTone(communicationProof.blocking)}
+          />
+        </View>
+        <Text style={styles.policyDetail}>{communicationProof.blockingCountLabel}</Text>
+        {communicationProof.items.map((item) => (
+          <View key={item.key} style={styles.proofRow}>
+            <Text style={styles.policyLabel}>{item.label}</Text>
+            <Text style={[styles.proofStatus, item.blocking ? styles.proofBlocked : styles.proofClear]}>
+              {item.statusLabel}
+            </Text>
+            <Text style={styles.policyDetail}>{item.detailLabel}</Text>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.emptyEvidence}>
         <Text style={styles.emptyTitle}>No live event log paired</Text>
         <Text style={styles.emptyCopy}>
@@ -85,10 +117,22 @@ const styles = StyleSheet.create({
   secondaryButton: { backgroundColor: "#334155" },
   disabledButton: { opacity: 0.48 },
   actionText: { color: "#ffffff", fontSize: 14, fontWeight: "900", textAlign: "center" },
+  panelHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  panelCopy: { flex: 1 },
   policyPanel: { backgroundColor: "#111827", borderColor: "#334155", borderRadius: 8, borderWidth: 1, padding: 14 },
   policyLabel: { color: "#94a3b8", fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
   policyValue: { color: "#f8fafc", fontSize: 16, fontWeight: "900", marginTop: 5 },
   policyDetail: { color: "#94a3b8", fontSize: 13, marginTop: 5 },
+  proofRow: {
+    borderTopColor: "#1e293b",
+    borderTopWidth: 1,
+    gap: 4,
+    marginTop: 10,
+    paddingTop: 10,
+  },
+  proofStatus: { fontSize: 14, fontWeight: "900", lineHeight: 19 },
+  proofBlocked: { color: "#fca5a5" },
+  proofClear: { color: "#86efac" },
   emptyEvidence: { backgroundColor: "#111827", borderColor: "#334155", borderRadius: 8, borderWidth: 1, padding: 14 },
   emptyTitle: { color: "#f8fafc", fontSize: 16, fontWeight: "900" },
   emptyCopy: { color: "#94a3b8", fontSize: 13, marginTop: 6 },

@@ -37,6 +37,22 @@ export interface CockpitSummary {
   canExecute: boolean;
 }
 
+export interface EngineCommunicationProofItem {
+  key: string;
+  label: string;
+  statusLabel: string;
+  detailLabel: string;
+  blocking: boolean;
+}
+
+export interface EngineCommunicationProofSummary {
+  gateLabel: string;
+  readyCountLabel: string;
+  blockingCountLabel: string;
+  blocking: boolean;
+  items: EngineCommunicationProofItem[];
+}
+
 export const NOT_PAIRED_OPERATOR_SNAPSHOT: OperatorSnapshot = {
   activeEngine: "none",
   phoneHealth: "unknown",
@@ -54,6 +70,7 @@ export function buildCockpitSummary(
 ): CockpitSummary {
   const hasFailoverSettings = failoverSettings !== undefined;
   const normalizedFailoverSettings = normalizeFailoverSettings(failoverSettings);
+  const communicationProof = buildEngineCommunicationProofSummary(snapshot);
   const activeEngineLabel =
     snapshot.activeEngine === "phone"
       ? "Phone Engine"
@@ -108,7 +125,7 @@ export function buildCockpitSummary(
         : false;
   const readinessCanExecute = snapshot.readiness === "live_ready" || snapshot.readiness === "paper_ready";
   const canExecute =
-    holderCanExecute && activeEngineEnabled && readinessCanExecute && snapshot.syncStatus === "synced";
+    holderCanExecute && activeEngineEnabled && readinessCanExecute && !communicationProof.blocking;
 
   return {
     activeEngineLabel,
@@ -128,6 +145,65 @@ export function buildCockpitSummary(
   };
 }
 
+export function buildEngineCommunicationProofSummary(snapshot: OperatorSnapshot): EngineCommunicationProofSummary {
+  const phoneHealthy = snapshot.phoneHealth === "healthy";
+  const remoteReachable = snapshot.remoteHealth === "healthy";
+  const leaseMatchesActiveEngine =
+    (snapshot.leaseState === "phone_held" && snapshot.activeEngine === "phone") ||
+    (snapshot.leaseState === "remote_held" && snapshot.activeEngine === "remote");
+  const transportConnected = snapshot.transport !== "none";
+  const eventLogSynced = snapshot.syncStatus === "synced";
+  const items: EngineCommunicationProofItem[] = [
+    {
+      key: "phone_health",
+      label: "Phone health",
+      statusLabel: phoneHealthy ? "Phone healthy" : "Phone not healthy",
+      detailLabel: formatEngineHealthDetail("Phone", snapshot.phoneHealth),
+      blocking: !phoneHealthy,
+    },
+    {
+      key: "remote_health",
+      label: "Remote health",
+      statusLabel: remoteReachable ? "Remote reachable" : "Remote not reachable",
+      detailLabel: formatEngineHealthDetail("Remote", snapshot.remoteHealth),
+      blocking: !remoteReachable,
+    },
+    {
+      key: "lease",
+      label: "Active lease",
+      statusLabel: leaseMatchesActiveEngine
+        ? `Lease matches ${formatActiveEngineLabel(snapshot.activeEngine)}`
+        : "Lease mismatch",
+      detailLabel: formatLeaseProofDetail(snapshot.leaseState, snapshot.activeEngine),
+      blocking: !leaseMatchesActiveEngine,
+    },
+    {
+      key: "transport",
+      label: "Transport",
+      statusLabel: transportConnected ? "Transport connected" : "Transport missing",
+      detailLabel: formatTransportProofDetail(snapshot.transport),
+      blocking: !transportConnected,
+    },
+    {
+      key: "sync",
+      label: "Event log sync",
+      statusLabel: eventLogSynced ? "Event log synced" : "Event log not synced",
+      detailLabel: `${snapshot.syncStatus} - ${snapshot.lastSyncLabel}`,
+      blocking: !eventLogSynced,
+    },
+  ];
+  const readyCount = items.filter((item) => !item.blocking).length;
+  const blockingCount = items.length - readyCount;
+
+  return {
+    gateLabel: blockingCount === 0 ? "Communication clear" : "Communication blocked",
+    readyCountLabel: `${readyCount}/${items.length} proof(s) clear`,
+    blockingCountLabel: blockingCount === 0 ? "No communication blockers" : `${blockingCount} communication blocker(s)`,
+    blocking: blockingCount > 0,
+    items,
+  };
+}
+
 interface OperatorState {
   snapshot: OperatorSnapshot;
   setSnapshot: (snapshot: OperatorSnapshot) => void;
@@ -137,3 +213,57 @@ export const useOperatorState = create<OperatorState>((set) => ({
   snapshot: NOT_PAIRED_OPERATOR_SNAPSHOT,
   setSnapshot: (snapshot) => set({ snapshot }),
 }));
+
+function formatActiveEngineLabel(activeEngine: ActiveEngine): string {
+  if (activeEngine === "phone") {
+    return "Phone Engine";
+  }
+  if (activeEngine === "remote") {
+    return "Remote Engine";
+  }
+  return "No active engine";
+}
+
+function formatEngineHealthDetail(label: "Phone" | "Remote", health: EngineHealth): string {
+  switch (health) {
+    case "healthy":
+      return `${label} heartbeat healthy`;
+    case "degraded":
+      return `${label} heartbeat degraded`;
+    case "offline":
+      return `${label} heartbeat offline`;
+    case "unknown":
+      return `${label} heartbeat missing`;
+  }
+}
+
+function formatLeaseProofDetail(leaseState: LeaseState, activeEngine: ActiveEngine): string {
+  const activeEngineLabel = formatActiveEngineLabel(activeEngine);
+  switch (leaseState) {
+    case "phone_held":
+      return activeEngine === "phone"
+        ? "Phone lease and active engine agree"
+        : `Phone lease but active engine is ${activeEngineLabel}`;
+    case "remote_held":
+      return activeEngine === "remote"
+        ? "Remote lease and active engine agree"
+        : `Remote lease but active engine is ${activeEngineLabel}`;
+    case "unclear":
+      return `Lease unclear while active engine is ${activeEngineLabel}`;
+    case "none":
+      return `No lease while active engine is ${activeEngineLabel}`;
+  }
+}
+
+function formatTransportProofDetail(transport: TransportState): string {
+  switch (transport) {
+    case "tailscale":
+      return "Tailscale transport selected";
+    case "same_wifi":
+      return "Same Wi-Fi transport selected";
+    case "cloud_relay":
+      return "Cloud relay transport selected";
+    case "none":
+      return "No transport evidence";
+  }
+}
