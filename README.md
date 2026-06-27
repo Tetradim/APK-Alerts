@@ -10,6 +10,7 @@ The foundation slice includes:
 - Expo mobile shell;
 - operator cockpit as the first screen;
 - failover settings for engine priority, engine enablement, transport preference, and phone alerts;
+- Engines tab remote Consolidation API health checks through `/api/health` and `/api/status`;
 - Alerts, Positions, Engines, Settings, and More tabs;
 - no mobile Lab tab;
 - no fake trading data.
