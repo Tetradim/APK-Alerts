@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DEFAULT_FAILOVER_SETTINGS } from "@apk-alerts/contracts";
 import {
   buildCockpitSummary,
   NOT_PAIRED_OPERATOR_SNAPSHOT,
@@ -38,13 +39,40 @@ test("phone-owned healthy cockpit summary shows remote dormant", () => {
 
 test("cockpit summary can include configured failover policy", () => {
   const summary = buildCockpitSummary(EXECUTABLE_PHONE_SNAPSHOT, {
-    engineLabel: "Phone then Remote",
-    transportLabel: "Tailscale with cloud fallback",
-    notificationsLabel: "Failover and offline alerts on",
+    ...DEFAULT_FAILOVER_SETTINGS,
+    enginePriority: "remote_then_phone",
+    allowCloudFallback: false,
   });
 
-  assert.equal(summary.policyLabel, "Phone then Remote");
-  assert.equal(summary.transportPolicyLabel, "Tailscale with cloud fallback");
+  assert.equal(summary.policyLabel, "Remote then Phone");
+  assert.equal(summary.transportPolicyLabel, "Tailscale only");
+});
+
+test("cockpit summary fails closed when active phone engine is disabled", () => {
+  const summary = buildCockpitSummary(EXECUTABLE_PHONE_SNAPSHOT, {
+    ...DEFAULT_FAILOVER_SETTINGS,
+    phoneEngineEnabled: false,
+  });
+
+  assert.equal(summary.policyLabel, "Remote only");
+  assert.equal(summary.canExecute, false);
+});
+
+test("cockpit summary fails closed when active remote engine is disabled", () => {
+  const summary = buildCockpitSummary(
+    {
+      ...EXECUTABLE_PHONE_SNAPSHOT,
+      activeEngine: "remote",
+      leaseState: "remote_held",
+    },
+    {
+      ...DEFAULT_FAILOVER_SETTINGS,
+      remoteEngineEnabled: false,
+    },
+  );
+
+  assert.equal(summary.policyLabel, "Phone only");
+  assert.equal(summary.canExecute, false);
 });
 
 test("active engine mismatch fails closed even with held lease readiness and sync", () => {

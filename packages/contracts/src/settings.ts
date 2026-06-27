@@ -11,7 +11,7 @@ export interface FailoverSettings {
   notifyWhenOffline: boolean;
 }
 
-export type FailoverSettingsInput = Partial<Record<keyof FailoverSettings, unknown>>;
+export type FailoverSettingsInput = Partial<Record<keyof FailoverSettings, unknown>> | null | undefined;
 
 export const DEFAULT_FAILOVER_SETTINGS: FailoverSettings = {
   enginePriority: "phone_then_remote",
@@ -44,31 +44,33 @@ function isTransportPreference(value: unknown): value is TransportPreference {
 }
 
 export function normalizeFailoverSettings(settings: FailoverSettingsInput = {}): FailoverSettings {
+  const input = settings && typeof settings === "object" ? settings : {};
+
   return {
-    enginePriority: isEnginePriority(settings.enginePriority)
-      ? settings.enginePriority
+    enginePriority: isEnginePriority(input.enginePriority)
+      ? input.enginePriority
       : DEFAULT_FAILOVER_SETTINGS.enginePriority,
     phoneEngineEnabled: normalizeBoolean(
-      settings.phoneEngineEnabled,
+      input.phoneEngineEnabled,
       DEFAULT_FAILOVER_SETTINGS.phoneEngineEnabled,
     ),
     remoteEngineEnabled: normalizeBoolean(
-      settings.remoteEngineEnabled,
+      input.remoteEngineEnabled,
       DEFAULT_FAILOVER_SETTINGS.remoteEngineEnabled,
     ),
-    transportPreference: isTransportPreference(settings.transportPreference)
-      ? settings.transportPreference
+    transportPreference: isTransportPreference(input.transportPreference)
+      ? input.transportPreference
       : DEFAULT_FAILOVER_SETTINGS.transportPreference,
     allowCloudFallback: normalizeBoolean(
-      settings.allowCloudFallback,
+      input.allowCloudFallback,
       DEFAULT_FAILOVER_SETTINGS.allowCloudFallback,
     ),
     notifyOnFailover: normalizeBoolean(
-      settings.notifyOnFailover,
+      input.notifyOnFailover,
       DEFAULT_FAILOVER_SETTINGS.notifyOnFailover,
     ),
     notifyWhenOffline: normalizeBoolean(
-      settings.notifyWhenOffline,
+      input.notifyWhenOffline,
       DEFAULT_FAILOVER_SETTINGS.notifyWhenOffline,
     ),
   };

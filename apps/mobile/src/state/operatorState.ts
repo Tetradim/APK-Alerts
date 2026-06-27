@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { SettingsSummary } from "./settingsState";
+import {
+  buildEnginePriorityLabel,
+  buildTransportLabel,
+  type FailoverSettingsInput,
+  normalizeFailoverSettings,
+} from "@apk-alerts/contracts";
 
 export type ActiveEngine = "phone" | "remote" | "none";
 export type EngineHealth = "healthy" | "degraded" | "offline" | "unknown";
@@ -45,8 +50,10 @@ export const NOT_PAIRED_OPERATOR_SNAPSHOT: OperatorSnapshot = {
 
 export function buildCockpitSummary(
   snapshot: OperatorSnapshot,
-  settingsSummary?: SettingsSummary,
+  failoverSettings?: FailoverSettingsInput,
 ): CockpitSummary {
+  const hasFailoverSettings = failoverSettings !== undefined;
+  const normalizedFailoverSettings = normalizeFailoverSettings(failoverSettings);
   const activeEngineLabel =
     snapshot.activeEngine === "phone"
       ? "Phone Engine"
@@ -93,8 +100,15 @@ export function buildCockpitSummary(
     (snapshot.leaseState === "remote_held" &&
       snapshot.activeEngine === "remote" &&
       snapshot.remoteHealth === "healthy");
+  const activeEngineEnabled =
+    snapshot.activeEngine === "phone"
+      ? normalizedFailoverSettings.phoneEngineEnabled
+      : snapshot.activeEngine === "remote"
+        ? normalizedFailoverSettings.remoteEngineEnabled
+        : false;
   const readinessCanExecute = snapshot.readiness === "live_ready" || snapshot.readiness === "paper_ready";
-  const canExecute = holderCanExecute && readinessCanExecute && snapshot.syncStatus === "synced";
+  const canExecute =
+    holderCanExecute && activeEngineEnabled && readinessCanExecute && snapshot.syncStatus === "synced";
 
   return {
     activeEngineLabel,
@@ -104,8 +118,12 @@ export function buildCockpitSummary(
     transportLabel,
     syncLabel: snapshot.syncStatus === "synced" ? `Synced ${snapshot.lastSyncLabel}` : "Sync unavailable",
     primaryActionLabel: snapshot.activeEngine === "none" ? "Pair Remote Engine" : "View Engine Health",
-    policyLabel: settingsSummary?.engineLabel ?? "No failover policy",
-    transportPolicyLabel: settingsSummary?.transportLabel ?? "No transport policy",
+    policyLabel: hasFailoverSettings
+      ? buildEnginePriorityLabel(normalizedFailoverSettings)
+      : "No failover policy",
+    transportPolicyLabel: hasFailoverSettings
+      ? buildTransportLabel(normalizedFailoverSettings)
+      : "No transport policy",
     canExecute,
   };
 }

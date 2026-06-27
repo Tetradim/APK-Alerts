@@ -3,13 +3,12 @@ import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import { buildCockpitSummary, useOperatorState } from "@/state/operatorState";
-import { buildSettingsSummary, useSettingsState } from "@/state/settingsState";
+import { useSettingsState } from "@/state/settingsState";
 
 export function CockpitScreen() {
   const snapshot = useOperatorState((state) => state.snapshot);
   const failoverSettings = useSettingsState((state) => state.snapshot.failoverSettings);
-  const settingsSummary = buildSettingsSummary(failoverSettings);
-  const summary = buildCockpitSummary(snapshot, settingsSummary);
+  const summary = buildCockpitSummary(snapshot, failoverSettings);
 
   return (
     <ScreenFrame title="Operator Cockpit" eyebrow="APK-Alerts">

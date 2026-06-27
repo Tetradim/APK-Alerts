@@ -89,6 +89,13 @@ test("malformed boolean settings use defaults instead of runtime coercion", () =
   assert.equal(canAnyEngineRun(remoteInput), true);
 });
 
+test("null root failover settings normalize to defaults", () => {
+  assert.deepEqual(normalizeFailoverSettings(null), DEFAULT_FAILOVER_SETTINGS);
+  assert.equal(canAnyEngineRun(null), true);
+  assert.equal(buildEnginePriorityLabel(null), "Phone then Remote");
+  assert.equal(buildTransportLabel(null), "Tailscale with cloud fallback");
+});
+
 test("invalid engine priority normalizes to the default phone-first preference", () => {
   const settings = {
     ...DEFAULT_FAILOVER_SETTINGS,
