@@ -228,6 +228,17 @@ export function buildAlertReconciliationTraceSummary(
   }
 
   if (!ingestion.tradeRequested) {
+    if (!chain.decision) {
+      return {
+        gateLabel: "Trace blocked",
+        alertLabel: ingestion.alertId ? `Alert ${ingestion.alertId}` : "No inserted alert id",
+        reconciliationLabel: "Audit decision required before clearing no-order trace",
+        orderLabel: "No order proven by signal only",
+        positionLabel: "No position proven by signal only",
+        auditLabel,
+        blocking: true,
+      };
+    }
     return {
       gateLabel: "Trace clear",
       alertLabel: ingestion.alertId ? `Alert ${ingestion.alertId}` : "No inserted alert id",

@@ -753,6 +753,43 @@ test("alert reconciliation trace does not require broker row for skipped alert",
   assert.equal(summary.blocking, false);
 });
 
+test("alert reconciliation trace blocks signal-only no-order alert without audit decision", () => {
+  const signalOnlySkipped = normalizeBridgeSignalEvent({
+    event_id: "bus-signal-only-skipped",
+    event_type: "signal.observed",
+    source_bot: "chrome-discord-bridge",
+    created_at: "2026-06-27T17:00:00.000Z",
+    correlation_id: "chrome-message-signal-only-skipped",
+    payload: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-signal-only-skipped",
+      channel_id: "chrome-alerts",
+      channel_name: "chrome-alerts",
+      author_id: "mike",
+      author_name: "MikeInvesting",
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser_metadata: { confidence: "low" },
+      ingestion_result: {
+        status: "skipped",
+        alert_inserted: false,
+        alert_id: "",
+        trade_requested: false,
+        trade_request_reason: "",
+        skip_reason: "parser confidence low below required medium",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [signalOnlySkipped], decisions: [] })[0];
+  const summary = buildAlertReconciliationTraceSummary(chain, []);
+
+  assert.equal(summary.gateLabel, "Trace blocked");
+  assert.equal(summary.reconciliationLabel, "Audit decision required before clearing no-order trace");
+  assert.equal(summary.orderLabel, "No order proven by signal only");
+  assert.equal(summary.positionLabel, "No position proven by signal only");
+  assert.equal(summary.auditLabel, "Audit proof missing");
+  assert.equal(summary.blocking, true);
+});
+
 test("alert reconciliation trace fails closed when chain is missing", () => {
   const summary = buildAlertReconciliationTraceSummary(null, []);
 
