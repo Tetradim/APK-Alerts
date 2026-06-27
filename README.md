@@ -2,13 +2,16 @@
 
 APK-Alerts is the Android-first mobile control app and phone-engine host for Consolidation.
 
-The approved design starts with:
+The foundation slice includes:
 
-- React Native / Expo for the mobile app;
-- typed event and lease contracts shared by mobile and engine code;
-- a phone-preferred active trading lease;
-- no fake trading data or sample broker modes;
-- no mobile Lab tab for backtests or replays.
+- npm workspace monorepo;
+- shared TypeScript event and lease contracts;
+- local append-only event log with duplicate idempotency-key protection;
+- Expo mobile shell;
+- operator cockpit as the first screen;
+- Alerts, Positions, Engines, Settings, and More tabs;
+- no mobile Lab tab;
+- no fake trading data.
 
 ## Development
 
@@ -36,4 +39,16 @@ Start the mobile app:
 npm run mobile:dev
 ```
 
-The first implementation slice builds contracts, a local event log, and the operator cockpit shell. Native Phone Engine execution, Tailscale pairing, credential provisioning, and broker execution are separate implementation slices.
+Run Android:
+
+```powershell
+npm run mobile:android
+```
+
+## Product Boundaries
+
+The app starts from a real not-paired state. It does not invent sample trades or show demo broker data.
+
+Backtests, replays, and parser lab workflows remain on Remote/Desktop Consolidation surfaces. Mobile focuses on operator status, alerts, positions, engine health, settings, logs, diagnostics, and exports.
+
+Native Phone Engine execution, embedded Python packaging, Tailscale pairing, credential provisioning, cloud relay fallback, and broker execution are separate implementation slices that build on this foundation.
