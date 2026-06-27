@@ -80,10 +80,15 @@ export function buildCockpitSummary(snapshot: OperatorSnapshot): CockpitSummary 
           ? "Cloud relay"
           : "No transport";
 
-  const canExecute =
-    (snapshot.leaseState === "phone_held" || snapshot.leaseState === "remote_held") &&
-    (snapshot.readiness === "live_ready" || snapshot.readiness === "paper_ready") &&
-    snapshot.syncStatus === "synced";
+  const holderCanExecute =
+    (snapshot.leaseState === "phone_held" &&
+      snapshot.activeEngine === "phone" &&
+      snapshot.phoneHealth === "healthy") ||
+    (snapshot.leaseState === "remote_held" &&
+      snapshot.activeEngine === "remote" &&
+      snapshot.remoteHealth === "healthy");
+  const readinessCanExecute = snapshot.readiness === "live_ready" || snapshot.readiness === "paper_ready";
+  const canExecute = holderCanExecute && readinessCanExecute && snapshot.syncStatus === "synced";
 
   return {
     activeEngineLabel,

@@ -32,10 +32,20 @@ export function CockpitScreen() {
       </View>
 
       <View style={styles.actionRow}>
-        <Pressable style={[styles.actionButton, styles.stopButton]} accessibilityRole="button">
+        <Pressable
+          style={[styles.actionButton, styles.stopButton, styles.disabledButton]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: true }}
+          disabled
+        >
           <Text style={styles.actionText}>Panic Stop</Text>
         </Pressable>
-        <Pressable style={[styles.actionButton, styles.secondaryButton]} accessibilityRole="button">
+        <Pressable
+          style={[styles.actionButton, styles.secondaryButton, styles.disabledButton]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: true }}
+          disabled
+        >
           <Text style={styles.actionText}>{summary.primaryActionLabel}</Text>
         </Pressable>
       </View>
@@ -65,6 +75,7 @@ const styles = StyleSheet.create({
   actionButton: { alignItems: "center", borderRadius: 8, flex: 1, minHeight: 48, justifyContent: "center", paddingHorizontal: 12 },
   stopButton: { backgroundColor: "#dc2626" },
   secondaryButton: { backgroundColor: "#334155" },
+  disabledButton: { opacity: 0.48 },
   actionText: { color: "#ffffff", fontSize: 14, fontWeight: "900", textAlign: "center" },
   emptyEvidence: { backgroundColor: "#111827", borderColor: "#334155", borderRadius: 8, borderWidth: 1, padding: 14 },
   emptyTitle: { color: "#f8fafc", fontSize: 16, fontWeight: "900" },
