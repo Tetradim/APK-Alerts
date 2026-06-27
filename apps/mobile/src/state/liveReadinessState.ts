@@ -46,6 +46,16 @@ export interface LiveReadinessSummary {
   errorLabel: string;
 }
 
+export interface ReplayAcceptanceEvidenceSummary {
+  statusLabel: string;
+  gateLabel: string;
+  detailLabel: string;
+  proofLabel: string;
+  failedEventsLabel: string;
+  missingEventsLabel: string;
+  blocking: boolean;
+}
+
 export interface LiveReadinessState {
   snapshot: LiveReadinessSnapshot;
   activeRequestId: number;
@@ -106,6 +116,36 @@ export function buildLiveReadinessSummary(snapshot: LiveReadinessSnapshot): Live
       : "Not armed",
     lastCheckLabel: snapshot.remote.checkedAt ? `Checked ${snapshot.remote.checkedAt}` : "Never checked",
     errorLabel: snapshot.lastError,
+  };
+}
+
+export function buildReplayAcceptanceEvidenceSummary(
+  snapshot: LiveReadinessSnapshot,
+): ReplayAcceptanceEvidenceSummary {
+  const replay = snapshot.remote.readiness.checks.simulationReplay;
+  const hasFailedEvents =
+    replay.failedCount > 0 ||
+    replay.failedEventCount > 0 ||
+    replay.failedEventIds.length > 0;
+  const hasMissingEvents = replay.missingEventCount > 0 || replay.missingEventIds.length > 0;
+  const hasReplayProof = replay.updatedAt.length > 0 && replay.replayUrl.length > 0;
+  const acceptedExpectedAlerts = replay.expectedCount > 0 && replay.passedCount >= replay.expectedCount;
+  const passed =
+    replay.acceptanceStatus === "passed" &&
+    acceptedExpectedAlerts &&
+    !hasFailedEvents &&
+    !hasMissingEvents &&
+    hasReplayProof;
+  const failed = replay.acceptanceStatus === "failed" || hasFailedEvents || hasMissingEvents;
+
+  return {
+    statusLabel: passed ? "Replay proof passed" : failed ? "Replay proof failed" : "Replay proof missing",
+    gateLabel: passed ? "Replay gate clear" : "Blocks live",
+    detailLabel: `${replay.passedCount}/${replay.expectedCount} expected alert(s) accepted`,
+    proofLabel: formatReplayProofLabel(replay.updatedAt, replay.replayUrl),
+    failedEventsLabel: formatReplayEventEvidenceLabel("Failed", replay.failedEventIds, replay.failedEventCount),
+    missingEventsLabel: formatReplayEventEvidenceLabel("Missing", replay.missingEventIds, replay.missingEventCount),
+    blocking: !passed,
   };
 }
 
@@ -226,4 +266,27 @@ function formatTransportLabel(connection: LiveReadinessConnection): string {
     case "none":
       return "Not paired";
   }
+}
+
+function formatReplayProofLabel(updatedAt: string, replayUrl: string): string {
+  if (updatedAt && replayUrl) {
+    return `Proof ${updatedAt} - ${replayUrl}`;
+  }
+  if (updatedAt) {
+    return `Proof ${updatedAt} - missing replay URL`;
+  }
+  if (replayUrl) {
+    return `Proof timestamp missing - ${replayUrl}`;
+  }
+  return "No replay proof timestamp or URL";
+}
+
+function formatReplayEventEvidenceLabel(label: "Failed" | "Missing", eventIds: string[], eventCount: number): string {
+  if (eventIds.length > 0) {
+    return `${label} events: ${eventIds.join(", ")}`;
+  }
+  if (eventCount > 0) {
+    return `${label} events: ${eventCount} unlisted`;
+  }
+  return `${label} events: none`;
 }

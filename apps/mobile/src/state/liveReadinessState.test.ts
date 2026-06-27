@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeLiveReadinessPayload } from "@apk-alerts/contracts";
 import {
+  buildReplayAcceptanceEvidenceSummary,
   buildLiveReadinessSummary,
   createLiveReadinessStore,
   getDefaultLiveReadinessSnapshot,
@@ -10,9 +11,9 @@ import {
 
 const readyPayload = {
   ready_for_live: true,
-  blocking_issues: [],
-  blocking_codes: [],
-  warnings: [],
+  blocking_issues: [] as Array<{ code: string; message: string }>,
+  blocking_codes: [] as string[],
+  warnings: [] as Array<{ code: string; message: string }>,
   checks: {
     role: { active_role: "live_executioner", valid: true, live_execution_allowed: true },
     api_auth: { configured: true, authless_desktop_mode: false },
@@ -21,7 +22,7 @@ const readyPayload = {
       active_broker: "alpaca",
       configured: true,
       connected: true,
-      missing_required_fields: [],
+      missing_required_fields: [] as string[],
       capabilities: {
         supports_live_trading: true,
         supports_options: true,
@@ -54,8 +55,8 @@ const readyPayload = {
       live_trading_armed: true,
       live_trading_armed_until: "2026-06-27T18:00:00Z",
     },
-    reconciliation: { unresolved_count: 0, unresolved_reasons: [] },
-    alert_chains: { live_blocking_attention_count: 0, live_blocking_attention_reasons: [] },
+    reconciliation: { unresolved_count: 0, unresolved_reasons: [] as string[] },
+    alert_chains: { live_blocking_attention_count: 0, live_blocking_attention_reasons: [] as string[] },
     simulation_replay: {
       proof_required: true,
       acceptance_status: "passed",
@@ -63,13 +64,13 @@ const readyPayload = {
       passed_count: 4,
       failed_count: 0,
       failed_event_count: 0,
-      failed_event_ids: [],
+      failed_event_ids: [] as string[],
       missing_event_count: 0,
-      missing_event_ids: [],
+      missing_event_ids: [] as string[],
       updated_at: "2026-06-27T17:00:00Z",
       replay_url: "http://127.0.0.1:8001/api/simulation/replay-events",
     },
-    readiness_gates: { missing_gate_keys: [], states: {} },
+    readiness_gates: { missing_gate_keys: [] as string[], states: {} },
   },
 };
 
@@ -156,6 +157,64 @@ test("blocking issues summarize first blocker and key risk sections", () => {
   assert.equal(summary.readinessLabel, "Blocked");
   assert.equal(summary.primaryReason, "active_broker_not_configured: Active broker has no saved configuration.");
   assert.equal(summary.brokerLabel, "alpaca - broker offline");
+});
+
+test("replay acceptance evidence summarizes a passing proof as non-blocking", () => {
+  const summary = buildReplayAcceptanceEvidenceSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: readinessSnapshot(),
+  });
+
+  assert.equal(summary.statusLabel, "Replay proof passed");
+  assert.equal(summary.gateLabel, "Replay gate clear");
+  assert.equal(summary.detailLabel, "4/4 expected alert(s) accepted");
+  assert.equal(summary.proofLabel, "Proof 2026-06-27T17:00:00Z - http://127.0.0.1:8001/api/simulation/replay-events");
+  assert.equal(summary.failedEventsLabel, "Failed events: none");
+  assert.equal(summary.missingEventsLabel, "Missing events: none");
+  assert.equal(summary.blocking, false);
+});
+
+test("replay acceptance evidence exposes failed and missing event IDs as blocking", () => {
+  const failedPayload = {
+    ...readyPayload,
+    ready_for_live: false,
+    blocking_issues: [{ code: "simulation_replay_acceptance_failed", message: "Simulation replay acceptance failed." }],
+    blocking_codes: ["simulation_replay_acceptance_failed"],
+    checks: {
+      ...readyPayload.checks,
+      simulation_replay: {
+        ...readyPayload.checks.simulation_replay,
+        acceptance_status: "failed",
+        passed_count: 2,
+        failed_count: 1,
+        failed_event_count: 1,
+        failed_event_ids: ["alert-1"],
+        missing_event_count: 1,
+        missing_event_ids: ["alert-2"],
+      },
+    },
+  };
+  const summary = buildReplayAcceptanceEvidenceSummary({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: readinessSnapshot(failedPayload),
+  });
+
+  assert.equal(summary.statusLabel, "Replay proof failed");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.detailLabel, "2/4 expected alert(s) accepted");
+  assert.equal(summary.failedEventsLabel, "Failed events: alert-1");
+  assert.equal(summary.missingEventsLabel, "Missing events: alert-2");
+  assert.equal(summary.blocking, true);
+});
+
+test("replay acceptance evidence treats empty proof as blocking", () => {
+  const summary = buildReplayAcceptanceEvidenceSummary(getDefaultLiveReadinessSnapshot());
+
+  assert.equal(summary.statusLabel, "Replay proof missing");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.detailLabel, "0/0 expected alert(s) accepted");
+  assert.equal(summary.proofLabel, "No replay proof timestamp or URL");
+  assert.equal(summary.blocking, true);
 });
 
 test("live-readiness store refreshes and clears stale readiness on connection edit", async () => {

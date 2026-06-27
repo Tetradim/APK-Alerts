@@ -3,7 +3,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
-import { buildLiveReadinessSummary, useLiveReadinessState } from "@/state/liveReadinessState";
+import {
+  buildLiveReadinessSummary,
+  buildReplayAcceptanceEvidenceSummary,
+  useLiveReadinessState,
+} from "@/state/liveReadinessState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
 
 function readinessTone(label: string): "good" | "warn" | "bad" | "neutral" {
@@ -22,6 +26,7 @@ export function MoreScreen() {
   const updateConnectionDraft = useLiveReadinessState((state) => state.updateConnectionDraft);
   const checkReadiness = useLiveReadinessState((state) => state.checkReadiness);
   const summary = buildLiveReadinessSummary(snapshot);
+  const replayEvidence = buildReplayAcceptanceEvidenceSummary(snapshot);
   const readiness = snapshot.remote.readiness;
 
   useEffect(() => {
@@ -84,6 +89,20 @@ export function MoreScreen() {
           value={readiness.checks.sourcePolicy.valid ? "Source policy valid" : "Source policy blocked"}
           detail={`${readiness.checks.sourcePolicy.autoLiveSources} auto-live source(s)`}
         />
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Replay acceptance</Text>
+            <Text style={styles.panelTitle}>{replayEvidence.statusLabel}</Text>
+          </View>
+          <StatusPill label={replayEvidence.gateLabel} tone={replayEvidence.blocking ? "bad" : "good"} />
+        </View>
+        <Text style={styles.detail}>{replayEvidence.detailLabel}</Text>
+        <Text style={styles.detail}>{replayEvidence.proofLabel}</Text>
+        <Text style={styles.detail}>{replayEvidence.failedEventsLabel}</Text>
+        <Text style={styles.detail}>{replayEvidence.missingEventsLabel}</Text>
       </View>
 
       <View style={styles.panel}>
