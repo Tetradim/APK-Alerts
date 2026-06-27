@@ -8,6 +8,11 @@ export interface PhoneEngineRuntimeSnapshot {
   nativeRuntimeAvailable: boolean;
   serviceEnabled: boolean;
   foregroundServiceActive: boolean;
+  discordEngineEmbedded: boolean;
+  brokerEngineEmbedded: boolean;
+  discordEngineReady: boolean;
+  brokerEngineReady: boolean;
+  liveExecutionArmed: boolean;
   health: PhoneEngineRuntimeHealth;
   lastHeartbeatAt: string;
   blockingReason: string;
@@ -32,6 +37,11 @@ export function getDefaultPhoneEngineRuntimeSnapshot(): PhoneEngineRuntimeSnapsh
     nativeRuntimeAvailable: false,
     serviceEnabled: false,
     foregroundServiceActive: false,
+    discordEngineEmbedded: false,
+    brokerEngineEmbedded: false,
+    discordEngineReady: false,
+    brokerEngineReady: false,
+    liveExecutionArmed: false,
     health: "unknown",
     lastHeartbeatAt: "",
     blockingReason: "Native Android foreground engine is not installed.",
@@ -45,6 +55,10 @@ export function buildPhoneEngineRuntimeSummary(
     snapshot.nativeRuntimeAvailable &&
     snapshot.serviceEnabled &&
     snapshot.foregroundServiceActive &&
+    snapshot.discordEngineEmbedded &&
+    snapshot.brokerEngineEmbedded &&
+    snapshot.discordEngineReady &&
+    snapshot.brokerEngineReady &&
     snapshot.health === "healthy" &&
     Boolean(snapshot.lastHeartbeatAt);
 
@@ -119,6 +133,12 @@ function formatPhoneRuntimeDetail(snapshot: PhoneEngineRuntimeSnapshot, canOwnLe
   }
   if (!snapshot.foregroundServiceActive) {
     return "Foreground service is not active.";
+  }
+  if (!snapshot.discordEngineEmbedded || !snapshot.brokerEngineEmbedded) {
+    return "Native Discord and broker adapters are not embedded.";
+  }
+  if (!snapshot.discordEngineReady || !snapshot.brokerEngineReady) {
+    return "Native Discord and broker adapters are not ready.";
   }
   if (!snapshot.lastHeartbeatAt) {
     return "Foreground service heartbeat missing.";
