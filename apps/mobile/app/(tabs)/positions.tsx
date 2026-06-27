@@ -1,10 +1,5 @@
-import { EmptyStateScreen } from "@/screens/EmptyStateScreen";
+import { PositionsScreen } from "@/screens/PositionsScreen";
 
 export default function PositionsRoute() {
-  return (
-    <EmptyStateScreen
-      title="Positions"
-      description="Pair a real engine to show positions, fills, exits, protection state, and broker reconciliation."
-    />
-  );
+  return <PositionsScreen />;
 }
