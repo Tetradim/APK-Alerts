@@ -442,6 +442,7 @@ export function buildSourcePolicySummary(chain: AlertEvidenceChain | null | unde
   }
 
   const passed =
+    Boolean(source.key) &&
     source.overrideMatched &&
     source.parserConfidenceAllowed &&
     source.observedParserConfidence !== "none" &&
@@ -739,6 +740,9 @@ function isTraceTerminalNoFill(status: string): boolean {
 }
 
 function formatSourceIdentityLabel(name: string, key: string, overrideMatched: boolean): string {
+  if (!key) {
+    return `${name || "Unknown source"} - source key missing`;
+  }
   const sourceName = name && key ? `${name} (${key})` : name || key || "Unknown source";
   return `${sourceName} - ${overrideMatched ? "override matched" : "override missing"}`;
 }
