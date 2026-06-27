@@ -227,6 +227,12 @@ function buildAlertContractProofSummary(chain: AlertEvidenceChain): { passed: bo
     if (chain.signal.eventId !== decision.eventId) {
       return { passed: false, label: "Signal/audit event mismatch" };
     }
+    if (chain.signal.channelId !== decision.channel.id) {
+      return { passed: false, label: "Signal/audit channel mismatch" };
+    }
+    if (chain.signal.authorId !== decision.author.id) {
+      return { passed: false, label: "Signal/audit author mismatch" };
+    }
     if (chain.signal.contractVersion !== CHROME_DISCORD_MESSAGE_CONTRACT_VERSION) {
       return {
         passed: false,
