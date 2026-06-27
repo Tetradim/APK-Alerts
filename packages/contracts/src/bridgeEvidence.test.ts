@@ -268,6 +268,29 @@ test("bridge health normalizes healthy supervisor tab counts", () => {
   assert.equal(health.supervisor.failures.length, 0);
 });
 
+test("bridge health requires concrete supervisor proof before healthy state", () => {
+  const health = normalizeBridgeHealthPayload({
+    healthy: true,
+    status: "healthy",
+    issues: [],
+    last_heartbeat: {
+      status: "ok",
+      bridge_enabled: true,
+      channel_id: "chrome-extension-service-worker",
+      observed_at: "2026-06-27T17:04:00.000Z",
+      details: {
+        source: "service_worker",
+        reason: "alarm",
+      },
+    },
+  });
+
+  assert.equal(health.supervisor.state, "attention");
+  assert.equal(health.supervisor.supervisedTabs, null);
+  assert.equal(health.supervisor.discordTabs, null);
+  assert.equal(health.supervisor.configuredTargets, null);
+});
+
 test("duplicate bridge events remain visible but not executable evidence", () => {
   const duplicate = normalizeBridgeSignalEvent({
     ...signalEvent,

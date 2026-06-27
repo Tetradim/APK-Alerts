@@ -215,6 +215,34 @@ test("bridge supervisor summary surfaces healthy service worker supervision", ()
   assert.equal(summary.blocking, false);
 });
 
+test("bridge supervisor summary blocks ok heartbeat without supervision proof", () => {
+  const summary = buildBridgeSupervisorSummary({
+    ...getDefaultAlertEvidenceSnapshot(),
+    evidence: evidenceSnapshot({
+      bridgeHealth: normalizeBridgeHealthPayload({
+        healthy: true,
+        status: "healthy",
+        issues: [],
+        last_heartbeat: {
+          status: "ok",
+          bridge_enabled: true,
+          channel_id: "chrome-extension-service-worker",
+          details: {
+            source: "service_worker",
+            reason: "alarm",
+          },
+        },
+      }),
+    }),
+  });
+
+  assert.equal(summary.statusLabel, "Supervisor attention");
+  assert.equal(summary.gateLabel, "Blocks live");
+  assert.equal(summary.detailLabel, "service_worker - alarm");
+  assert.equal(summary.tabLabel, "Tabs: not reported");
+  assert.equal(summary.blocking, true);
+});
+
 test("bridge supervisor summary surfaces restart backoff and failures", () => {
   const summary = buildBridgeSupervisorSummary({
     ...getDefaultAlertEvidenceSnapshot(),

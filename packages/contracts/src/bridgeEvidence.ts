@@ -376,7 +376,14 @@ function classifyBridgeSupervisorState(
     return "backoff";
   }
   if (healthStatus === "healthy" && heartbeat.status === "ok") {
-    return "healthy";
+    const details = heartbeat.details;
+    const hasFailureEvidence = stringArray(details.failures).length > 0 || Boolean(text(details.error));
+    const hasSupervisionProof = [
+      nonNegativeIntegerOrNull(details.supervised_tabs),
+      nonNegativeIntegerOrNull(details.discord_tabs),
+      nonNegativeIntegerOrNull(details.configured_targets),
+    ].some((count) => count !== null && count > 0);
+    return !hasFailureEvidence && hasSupervisionProof ? "healthy" : "attention";
   }
   if (healthStatus === "unhealthy") {
     return "attention";
