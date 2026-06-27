@@ -77,7 +77,7 @@ git diff --check
 
 Expected: all commands exit 0.
 
-- [ ] **Step 2: Commit and push**
+- [x] **Step 2: Commit and push**
 
 Run:
 
