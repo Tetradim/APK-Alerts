@@ -5,12 +5,14 @@ import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import {
   buildAlertEvidenceSummary,
+  buildAlertReconciliationTraceSummary,
   buildAlertTestEvidenceSummary,
   buildBridgeSupervisorSummary,
   buildQueuePlaceEvidenceSummary,
   buildSourcePolicySummary,
   useAlertEvidenceState,
 } from "@/state/alertEvidenceState";
+import { useReconciliationState } from "@/state/reconciliationState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
 
 function healthTone(label: string): "good" | "warn" | "bad" | "neutral" {
@@ -49,11 +51,17 @@ function alertTestTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
   return blocking ? "bad" : "good";
 }
 
+function traceTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
+}
+
 export function AlertsScreen() {
   const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
   const snapshot = useAlertEvidenceState((state) => state.snapshot);
   const updateConnectionDraft = useAlertEvidenceState((state) => state.updateConnectionDraft);
   const refreshEvidence = useAlertEvidenceState((state) => state.refreshEvidence);
+  const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
+  const updateReconciliationConnectionDraft = useReconciliationState((state) => state.updateConnectionDraft);
   const summary = buildAlertEvidenceSummary(snapshot);
   const supervisor = buildBridgeSupervisorSummary(snapshot);
 
@@ -67,12 +75,24 @@ export function AlertsScreen() {
         apiKey: remoteConnection.apiKey,
       });
     }
+    if (
+      remoteConnection.baseApiUrl !== reconciliationSnapshot.connection.baseApiUrl ||
+      remoteConnection.apiKey !== reconciliationSnapshot.connection.apiKey
+    ) {
+      updateReconciliationConnectionDraft({
+        baseApiUrl: remoteConnection.baseApiUrl,
+        apiKey: remoteConnection.apiKey,
+      });
+    }
   }, [
     remoteConnection.baseApiUrl,
     remoteConnection.apiKey,
     snapshot.connection.baseApiUrl,
     snapshot.connection.apiKey,
+    reconciliationSnapshot.connection.baseApiUrl,
+    reconciliationSnapshot.connection.apiKey,
     updateConnectionDraft,
+    updateReconciliationConnectionDraft,
   ]);
 
   return (
@@ -136,6 +156,10 @@ export function AlertsScreen() {
           const alertTest = buildAlertTestEvidenceSummary(chain);
           const sourcePolicy = buildSourcePolicySummary(chain);
           const queuePlace = buildQueuePlaceEvidenceSummary(chain);
+          const reconciliationTrace = buildAlertReconciliationTraceSummary(
+            chain,
+            reconciliationSnapshot.remote.rows,
+          );
           return (
             <View key={chain.eventId} style={styles.panel}>
               <View style={styles.panelHeader}>
@@ -167,6 +191,18 @@ export function AlertsScreen() {
               <Text style={styles.detail}>{queuePlace.queueLabel}</Text>
               <Text style={styles.detail}>{queuePlace.reasonLabel}</Text>
               <Text style={styles.detail}>{queuePlace.auditLabel}</Text>
+              <View style={styles.evidenceHeader}>
+                <Text style={styles.label}>Reconciliation trace</Text>
+                <StatusPill
+                  label={reconciliationTrace.gateLabel}
+                  tone={traceTone(reconciliationTrace.blocking)}
+                />
+              </View>
+              <Text style={styles.detail}>{reconciliationTrace.alertLabel}</Text>
+              <Text style={styles.detail}>{reconciliationTrace.reconciliationLabel}</Text>
+              <Text style={styles.detail}>{reconciliationTrace.orderLabel}</Text>
+              <Text style={styles.detail}>{reconciliationTrace.positionLabel}</Text>
+              <Text style={styles.detail}>{reconciliationTrace.auditLabel}</Text>
               <View style={styles.sourcePolicyHeader}>
                 <Text style={styles.label}>Source policy</Text>
                 <StatusPill label={sourcePolicy.gateLabel} tone={sourcePolicyTone(sourcePolicy.blocking)} />

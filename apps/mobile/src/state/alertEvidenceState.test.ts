@@ -3,11 +3,13 @@ import test from "node:test";
 import {
   CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
   buildAlertEvidenceChains,
+  normalizeReconciliationPayload,
   normalizeBridgeAlertDecisionEvent,
   normalizeBridgeHealthPayload,
   normalizeBridgeSignalEvent,
 } from "@apk-alerts/contracts";
 import {
+  buildAlertReconciliationTraceSummary,
   buildAlertTestEvidenceSummary,
   buildBridgeSupervisorSummary,
   buildQueuePlaceEvidenceSummary,
@@ -619,6 +621,147 @@ test("alert test evidence summary fails closed when no chain exists", () => {
   assert.equal(summary.queueLabel, "Queue proof missing");
   assert.equal(summary.auditLabel, "Audit proof missing");
   assert.equal(summary.captureLabel, "No capture evidence");
+  assert.equal(summary.blocking, true);
+});
+
+test("alert reconciliation trace clears queued alert with exact reconciliation row", () => {
+  const queuedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-trace",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-trace",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        override_matched: true,
+        parser_confidence_allowed: true,
+        channel_url_allowed: true,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-trace",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const [row] = normalizeReconciliationPayload([
+    {
+      alert_id: "alert-trace",
+      trade_id: "trade-trace",
+      trade_status: "filled",
+      order_id: "order-trace",
+      position_id: "position-trace",
+      position_status: "open",
+      simulated: false,
+      attention_reason: "",
+    },
+  ]);
+  const chain = buildAlertEvidenceChains({ signals: [], decisions: [queuedDecision] })[0];
+  assert.ok(row);
+  const summary = buildAlertReconciliationTraceSummary(chain, [row]);
+
+  assert.equal(summary.gateLabel, "Trace clear");
+  assert.equal(summary.alertLabel, "Alert alert-trace");
+  assert.equal(summary.reconciliationLabel, "Reconciled row matched");
+  assert.equal(summary.orderLabel, "Order order-trace");
+  assert.equal(summary.positionLabel, "Position position-trace - open");
+  assert.equal(summary.auditLabel, "Audit audit-trace");
+  assert.equal(summary.blocking, false);
+});
+
+test("alert reconciliation trace blocks queued alert without exact reconciliation row", () => {
+  const queuedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-missing-trace",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-missing-trace",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: { metadata_policy_passed: true },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-missing-trace",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [], decisions: [queuedDecision] })[0];
+  const summary = buildAlertReconciliationTraceSummary(chain, []);
+
+  assert.equal(summary.gateLabel, "Trace blocked");
+  assert.equal(summary.reconciliationLabel, "No reconciliation row for alert alert-missing-trace");
+  assert.equal(summary.orderLabel, "Order proof missing");
+  assert.equal(summary.positionLabel, "Position proof missing");
+  assert.equal(summary.blocking, true);
+});
+
+test("alert reconciliation trace does not require broker row for skipped alert", () => {
+  const skippedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-skipped-trace",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert skipped.",
+    severity: "warning",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-skipped-trace",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "low" },
+      source: { metadata_policy_passed: false },
+      decision: {
+        status: "skipped",
+        alert_inserted: false,
+        alert_id: "",
+        trade_requested: false,
+        trade_request_reason: "",
+        skip_reason: "parser confidence low below required medium",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [], decisions: [skippedDecision] })[0];
+  const summary = buildAlertReconciliationTraceSummary(chain, []);
+
+  assert.equal(summary.gateLabel, "Trace clear");
+  assert.equal(summary.reconciliationLabel, "No broker reconciliation required");
+  assert.equal(summary.orderLabel, "No order expected");
+  assert.equal(summary.positionLabel, "No position expected");
+  assert.equal(summary.blocking, false);
+});
+
+test("alert reconciliation trace fails closed when chain is missing", () => {
+  const summary = buildAlertReconciliationTraceSummary(null, []);
+
+  assert.equal(summary.gateLabel, "Trace blocked");
+  assert.equal(summary.alertLabel, "Alert proof missing");
+  assert.equal(summary.reconciliationLabel, "No alert chain to reconcile");
+  assert.equal(summary.orderLabel, "Order proof missing");
+  assert.equal(summary.positionLabel, "Position proof missing");
+  assert.equal(summary.auditLabel, "Audit proof missing");
   assert.equal(summary.blocking, true);
 });
 

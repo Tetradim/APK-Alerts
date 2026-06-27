@@ -1,4 +1,4 @@
-import { normalizeBridgeHealthPayload, type AlertEvidenceChain } from "@apk-alerts/contracts";
+import { normalizeBridgeHealthPayload, type AlertEvidenceChain, type ReconciliationRow } from "@apk-alerts/contracts";
 import {
   fetchRemoteAlertEvidence,
   type RemoteAlertEvidenceResult,
@@ -82,6 +82,16 @@ export interface AlertTestEvidenceSummary {
   queueLabel: string;
   auditLabel: string;
   captureLabel: string;
+  blocking: boolean;
+}
+
+export interface AlertReconciliationTraceSummary {
+  gateLabel: string;
+  alertLabel: string;
+  reconciliationLabel: string;
+  orderLabel: string;
+  positionLabel: string;
+  auditLabel: string;
   blocking: boolean;
 }
 
@@ -184,6 +194,85 @@ export function buildAlertTestEvidenceSummary(chain: AlertEvidenceChain | null |
     auditLabel: chain.decision?.auditEventId ? `Audit ${chain.decision.auditEventId}` : "Audit proof missing",
     captureLabel: formatAlertTestCaptureLabel(chain),
     blocking: !clear,
+  };
+}
+
+export function buildAlertReconciliationTraceSummary(
+  chain: AlertEvidenceChain | null | undefined,
+  rows: ReconciliationRow[],
+): AlertReconciliationTraceSummary {
+  if (!chain) {
+    return {
+      gateLabel: "Trace blocked",
+      alertLabel: "Alert proof missing",
+      reconciliationLabel: "No alert chain to reconcile",
+      orderLabel: "Order proof missing",
+      positionLabel: "Position proof missing",
+      auditLabel: "Audit proof missing",
+      blocking: true,
+    };
+  }
+
+  const ingestion = chain.decision?.decision ?? chain.signal?.ingestion ?? null;
+  const auditLabel = chain.decision?.auditEventId ? `Audit ${chain.decision.auditEventId}` : "Audit proof missing";
+  if (!ingestion) {
+    return {
+      gateLabel: "Trace blocked",
+      alertLabel: "Alert proof missing",
+      reconciliationLabel: "Ingestion proof missing",
+      orderLabel: "Order proof missing",
+      positionLabel: "Position proof missing",
+      auditLabel,
+      blocking: true,
+    };
+  }
+
+  if (!ingestion.tradeRequested) {
+    return {
+      gateLabel: "Trace clear",
+      alertLabel: ingestion.alertId ? `Alert ${ingestion.alertId}` : "No inserted alert id",
+      reconciliationLabel: "No broker reconciliation required",
+      orderLabel: "No order expected",
+      positionLabel: "No position expected",
+      auditLabel,
+      blocking: false,
+    };
+  }
+
+  if (!ingestion.alertId) {
+    return {
+      gateLabel: "Trace blocked",
+      alertLabel: "Inserted alert id missing",
+      reconciliationLabel: "Cannot match reconciliation without alert id",
+      orderLabel: "Order proof missing",
+      positionLabel: "Position proof missing",
+      auditLabel,
+      blocking: true,
+    };
+  }
+
+  const row = rows.find((candidate) => candidate.alertId === ingestion.alertId) ?? null;
+  if (!row) {
+    return {
+      gateLabel: "Trace blocked",
+      alertLabel: `Alert ${ingestion.alertId}`,
+      reconciliationLabel: `No reconciliation row for alert ${ingestion.alertId}`,
+      orderLabel: "Order proof missing",
+      positionLabel: "Position proof missing",
+      auditLabel,
+      blocking: true,
+    };
+  }
+
+  const blocking = row.liveBlocking;
+  return {
+    gateLabel: blocking ? "Trace blocked" : "Trace clear",
+    alertLabel: `Alert ${ingestion.alertId}`,
+    reconciliationLabel: formatTraceReconciliationLabel(row),
+    orderLabel: formatTraceOrderLabel(row),
+    positionLabel: formatTracePositionLabel(row),
+    auditLabel,
+    blocking,
   };
 }
 
@@ -485,6 +574,43 @@ function formatAlertTestCaptureLabel(chain: AlertEvidenceChain): string {
     return "No physical capture";
   }
   return "No capture evidence";
+}
+
+function formatTraceReconciliationLabel(row: ReconciliationRow): string {
+  if (row.liveBlocking) {
+    return `Reconciliation blocking: ${row.attentionReason || "attention required"}`;
+  }
+  if (row.attentionReason) {
+    return `Reconciliation attention: ${row.attentionReason}`;
+  }
+  return "Reconciled row matched";
+}
+
+function formatTraceOrderLabel(row: ReconciliationRow): string {
+  if (row.orderId) {
+    return `Order ${row.orderId}`;
+  }
+  if (row.tradeId) {
+    return `Trade ${row.tradeId}; order id missing`;
+  }
+  return "Order proof missing";
+}
+
+function formatTracePositionLabel(row: ReconciliationRow): string {
+  if (row.positionId && row.positionStatus) {
+    return `Position ${row.positionId} - ${row.positionStatus}`;
+  }
+  if (row.positionId) {
+    return `Position ${row.positionId}`;
+  }
+  if (isTraceTerminalNoFill(row.tradeStatus)) {
+    return `No position expected (${row.tradeStatus})`;
+  }
+  return "Position proof missing";
+}
+
+function isTraceTerminalNoFill(status: string): boolean {
+  return ["failed", "rejected", "canceled", "cancelled", "expired", "closed"].includes(status);
 }
 
 function formatSourceIdentityLabel(name: string, key: string, overrideMatched: boolean): string {
