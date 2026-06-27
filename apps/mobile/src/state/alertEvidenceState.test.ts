@@ -729,6 +729,122 @@ test("alert test evidence summary accepts complete silent audit-only proof witho
   assert.equal(summary.blocking, false);
 });
 
+test("alert test evidence summary blocks parser confidence without parsed payload", () => {
+  const variants = [
+    {
+      name: "silent audit missing parsed payload",
+      physical: false,
+      signalParsed: { ticker: "SPY" },
+      decisionParsed: null,
+    },
+    {
+      name: "physical signal missing parsed payload",
+      physical: true,
+      signalParsed: null,
+      decisionParsed: { ticker: "SPY" },
+    },
+    {
+      name: "physical audit missing parsed payload",
+      physical: true,
+      signalParsed: { ticker: "SPY" },
+      decisionParsed: null,
+    },
+  ];
+
+  for (const variant of variants) {
+    const eventId = `parser-payload-${variant.name.replaceAll(" ", "-")}`;
+    const signalPayload: Record<string, unknown> = {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: eventId,
+      channel_id: "chrome-alerts",
+      channel_name: "chrome-alerts",
+      author_id: "mike",
+      author_name: "MikeInvesting",
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser_metadata: { confidence: "high" },
+      ingestion_result: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: `alert-${variant.name.replaceAll(" ", "-")}`,
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    };
+    const decisionDetails: Record<string, unknown> = {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: eventId,
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
+        channel_url_allowed: true,
+        allowed_author_id_count: 1,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: `alert-${variant.name.replaceAll(" ", "-")}`,
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    };
+    if (variant.signalParsed) {
+      signalPayload.parsed = variant.signalParsed;
+    }
+    if (variant.decisionParsed) {
+      decisionDetails.parsed = variant.decisionParsed;
+    }
+
+    const signals = variant.physical
+      ? [
+          normalizeBridgeSignalEvent({
+            event_id: `bus-${variant.name.replaceAll(" ", "-")}`,
+            event_type: "signal.observed",
+            source_bot: "chrome-discord-bridge",
+            created_at: "2026-06-27T17:00:00.000Z",
+            correlation_id: eventId,
+            payload: signalPayload,
+          }),
+        ]
+      : [];
+    const decision = normalizeBridgeAlertDecisionEvent({
+      id: `audit-${variant.name.replaceAll(" ", "-")}`,
+      category: "alert_ingestion",
+      action: "bridge_alert_decision",
+      summary: "Chrome bridge alert accepted and queued.",
+      severity: "info",
+      created_at: "2026-06-27T17:00:01.000Z",
+      details: decisionDetails,
+    });
+    const chain = buildAlertEvidenceChains({ signals, decisions: [decision] })[0];
+    const summary = buildAlertTestEvidenceSummary(chain);
+
+    assert.equal(
+      summary.modeLabel,
+      variant.physical ? "Physical bridge test" : "Silent audit test",
+      variant.name,
+    );
+    assert.equal(summary.gateLabel, "Blocks test", variant.name);
+    assert.equal(summary.contractLabel, "Contract chrome.discord.message.v1", variant.name);
+    assert.equal(summary.parserLabel, "Parsed payload missing", variant.name);
+    assert.equal(summary.queueLabel, "Order request queued", variant.name);
+    assert.equal(summary.auditLabel, `Audit audit-${variant.name.replaceAll(" ", "-")}`, variant.name);
+    assert.equal(summary.blocking, true, variant.name);
+  }
+});
+
 test("alert test evidence summary blocks missing event id and stale contract proof", () => {
   const variants = [
     {

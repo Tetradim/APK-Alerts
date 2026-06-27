@@ -189,21 +189,31 @@ export function buildAlertTestEvidenceSummary(chain: AlertEvidenceChain | null |
   const source = buildSourcePolicySummary(chain);
   const queue = buildQueuePlaceEvidenceSummary(chain);
   const contract = buildAlertContractProofSummary(chain);
-  const hasParserProof = chain.parserConfidence !== "none";
+  const parser = buildAlertParserProofSummary(chain);
   const hasAuditProof = Boolean(chain.decision?.auditEventId);
-  const clear = contract.passed && hasParserProof && !source.blocking && !queue.blocking && hasAuditProof;
+  const clear = contract.passed && parser.passed && !source.blocking && !queue.blocking && hasAuditProof;
 
   return {
     modeLabel: formatAlertTestModeLabel(Boolean(chain.signal), Boolean(chain.decision)),
     gateLabel: clear ? "Test proof clear" : "Blocks test",
     contractLabel: contract.label,
-    parserLabel: hasParserProof ? `Parser proof ${chain.parserConfidence}` : "Parser proof missing",
+    parserLabel: parser.label,
     sourceLabel: source.statusLabel,
     queueLabel: formatAlertTestQueueLabel(queue),
     auditLabel: chain.decision?.auditEventId ? `Audit ${chain.decision.auditEventId}` : "Audit proof missing",
     captureLabel: formatAlertTestCaptureLabel(chain),
     blocking: !clear,
   };
+}
+
+function buildAlertParserProofSummary(chain: AlertEvidenceChain): { passed: boolean; label: string } {
+  if (chain.parserConfidence === "none") {
+    return { passed: false, label: "Parser proof missing" };
+  }
+  if (!chain.decision?.parsed || (chain.signal && !chain.signal.parsed)) {
+    return { passed: false, label: "Parsed payload missing" };
+  }
+  return { passed: true, label: `Parser proof ${chain.parserConfidence}` };
 }
 
 function buildAlertContractProofSummary(chain: AlertEvidenceChain): { passed: boolean; label: string } {
