@@ -8,6 +8,16 @@ import {
   reduceLeaseEvent,
 } from "./index.js";
 
+createEvent({
+  id: "event-invalid-payload",
+  type: "lease.acquired.v1",
+  sourceEngineId: "phone:pixel-1",
+  observedAt: "2026-06-27T05:00:00.000Z",
+  sequence: 1,
+  // @ts-expect-error Known trading event types must require their contract payloads.
+  payload: { unexpected: true },
+});
+
 test("phone engine can execute only while it holds an active lease", () => {
   const leaseEvent = createEvent({
     id: "event-1",
@@ -67,6 +77,119 @@ test("lease relinquish clears execution authority", () => {
 
   assert.equal(relinquished.holderEngineId, null);
   assert.equal(canEngineExecute(relinquished, "phone:pixel-1", Date.parse("2026-06-27T05:03:00.000Z")), false);
+});
+
+test("lease requested only updates last event and does not grant authority", () => {
+  const state = reduceLeaseEvent(
+    EMPTY_LEASE_STATE,
+    createEvent({
+      id: "event-requested",
+      type: "lease.requested.v1",
+      sourceEngineId: "phone:pixel-1",
+      observedAt: "2026-06-27T05:00:00.000Z",
+      sequence: 1,
+      payload: {
+        leaseId: "lease-requested",
+        holderEngineId: "phone:pixel-1",
+        expiresAt: "2026-06-27T05:05:00.000Z",
+        reason: "phone engine requested lease",
+      },
+    }),
+  );
+
+  assert.equal(state.leaseId, null);
+  assert.equal(state.holderEngineId, null);
+  assert.equal(state.expiresAtMs, null);
+  assert.equal(state.lastEventId, "event-requested");
+  assert.equal(canEngineExecute(state, "phone:pixel-1", Date.parse("2026-06-27T05:01:00.000Z")), false);
+});
+
+test("invalid and null expiry fail closed for acquired and renewed leases", () => {
+  const acquiredWithNullExpiry = reduceLeaseEvent(
+    EMPTY_LEASE_STATE,
+    createEvent({
+      id: "event-null-expiry",
+      type: "lease.acquired.v1",
+      sourceEngineId: "phone:pixel-1",
+      observedAt: "2026-06-27T05:00:00.000Z",
+      sequence: 1,
+      payload: {
+        leaseId: "lease-null-expiry",
+        holderEngineId: "phone:pixel-1",
+        expiresAt: null,
+        reason: "missing expiry",
+      },
+    }),
+  );
+
+  assert.equal(
+    canEngineExecute(acquiredWithNullExpiry, "phone:pixel-1", Date.parse("2026-06-27T05:01:00.000Z")),
+    false,
+  );
+
+  const renewedWithInvalidExpiry = reduceLeaseEvent(
+    EMPTY_LEASE_STATE,
+    createEvent({
+      id: "event-invalid-expiry",
+      type: "lease.renewed.v1",
+      sourceEngineId: "phone:pixel-1",
+      observedAt: "2026-06-27T05:00:00.000Z",
+      sequence: 1,
+      payload: {
+        leaseId: "lease-invalid-expiry",
+        holderEngineId: "phone:pixel-1",
+        expiresAt: "not-a-date",
+        reason: "invalid expiry",
+      },
+    }),
+  );
+
+  assert.equal(
+    canEngineExecute(renewedWithInvalidExpiry, "phone:pixel-1", Date.parse("2026-06-27T05:01:00.000Z")),
+    false,
+  );
+});
+
+test("lease expired clears execution authority", () => {
+  const acquired = reduceLeaseEvent(
+    EMPTY_LEASE_STATE,
+    createEvent({
+      id: "event-acquired",
+      type: "lease.acquired.v1",
+      sourceEngineId: "phone:pixel-1",
+      observedAt: "2026-06-27T05:00:00.000Z",
+      sequence: 1,
+      payload: {
+        leaseId: "lease-1",
+        holderEngineId: "phone:pixel-1",
+        expiresAt: "2026-06-27T05:05:00.000Z",
+        reason: "phone engine healthy",
+      },
+    }),
+  );
+
+  const expired = reduceLeaseEvent(
+    acquired,
+    createEvent({
+      id: "event-expired",
+      type: "lease.expired.v1",
+      sourceEngineId: "remote:windows-pc",
+      observedAt: "2026-06-27T05:05:00.000Z",
+      sequence: 2,
+      payload: {
+        leaseId: "lease-1",
+        holderEngineId: null,
+        expiresAt: null,
+        reason: "lease timeout",
+      },
+    }),
+  );
+
+  assert.equal(expired.leaseId, null);
+  assert.equal(expired.holderEngineId, null);
+  assert.equal(expired.expiresAtMs, null);
+  assert.equal(expired.lastEventId, "event-expired");
+  assert.equal(canEngineExecute(expired, "phone:pixel-1", Date.parse("2026-06-27T05:04:00.000Z")), false);
 });
 
 test("idempotency keys normalize duplicate order intent identity", () => {

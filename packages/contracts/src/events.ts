@@ -99,29 +99,26 @@ export type AnyTradingEvent =
   | BaseEvent<"operator.notification.v1", Record<string, unknown>>
   | BaseEvent<"emergency.stop.v1", { reason: string }>;
 
-export type TradingEventPayload<TType extends TradingEventType> =
-  TType extends "engine.health.v1"
-    ? EngineHealthPayload
-    : TType extends "transport.health.v1"
-      ? TransportHealthPayload
-      : TType extends
-            | "lease.requested.v1"
-            | "lease.acquired.v1"
-            | "lease.renewed.v1"
-            | "lease.relinquished.v1"
-            | "lease.expired.v1"
-        ? LeasePayload
-        : TType extends "discord.alert.observed.v1"
-          ? DiscordAlertObservedPayload
-          : TType extends "alert.parse.decision.v1"
-            ? AlertParseDecisionPayload
-            : TType extends "order.intent.v1"
-              ? OrderIntentPayload
-              : TType extends "emergency.stop.v1"
-                ? { reason: string }
-                : Record<string, unknown>;
+export interface TradingEventPayloadByType {
+  "engine.health.v1": EngineHealthPayload;
+  "transport.health.v1": TransportHealthPayload;
+  "lease.requested.v1": LeasePayload;
+  "lease.acquired.v1": LeasePayload;
+  "lease.renewed.v1": LeasePayload;
+  "lease.relinquished.v1": LeasePayload;
+  "lease.expired.v1": LeasePayload;
+  "discord.alert.observed.v1": DiscordAlertObservedPayload;
+  "alert.parse.decision.v1": AlertParseDecisionPayload;
+  "order.intent.v1": OrderIntentPayload;
+  "broker.order.update.v1": Record<string, unknown>;
+  "position.reconciled.v1": Record<string, unknown>;
+  "operator.notification.v1": Record<string, unknown>;
+  "emergency.stop.v1": { reason: string };
+}
 
-export interface CreateEventInput<TType extends TradingEventType, TPayload = TradingEventPayload<TType>> {
+export type TradingEventPayload<TType extends TradingEventType> = TradingEventPayloadByType[TType];
+
+export interface CreateEventInput<TType extends TradingEventType> {
   id: string;
   type: TType;
   sourceEngineId: EngineId;
@@ -129,18 +126,12 @@ export interface CreateEventInput<TType extends TradingEventType, TPayload = Tra
   sequence: number;
   previousEventId?: string | null;
   idempotencyKey?: string | null;
-  payload: TPayload;
+  payload: TradingEventPayloadByType[TType];
 }
 
 export function createEvent<TType extends TradingEventType>(
-  input: CreateEventInput<TType, TradingEventPayload<TType>>,
-): BaseEvent<TType, TradingEventPayload<TType>>;
-export function createEvent<TType extends TradingEventType, TPayload>(
-  input: CreateEventInput<TType, TPayload>,
-): BaseEvent<TType, TPayload>;
-export function createEvent<TType extends TradingEventType, TPayload>(
-  input: CreateEventInput<TType, TPayload>,
-): BaseEvent<TType, TPayload> {
+  input: CreateEventInput<TType>,
+): BaseEvent<TType, TradingEventPayloadByType[TType]> {
   return {
     id: input.id,
     type: input.type,
