@@ -12,6 +12,10 @@ import {
   buildSourcePolicySummary,
   useAlertEvidenceState,
 } from "@/state/alertEvidenceState";
+import {
+  buildPeerAlertOutcomeSummary,
+  usePeerAlertFailsafeState,
+} from "@/state/peerAlertFailsafeState";
 import { useReconciliationState } from "@/state/reconciliationState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
 
@@ -55,6 +59,10 @@ function traceTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
   return blocking ? "bad" : "good";
 }
 
+function peerChallengeTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
+}
+
 export function AlertsScreen() {
   const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
   const snapshot = useAlertEvidenceState((state) => state.snapshot);
@@ -62,8 +70,10 @@ export function AlertsScreen() {
   const refreshEvidence = useAlertEvidenceState((state) => state.refreshEvidence);
   const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
   const updateReconciliationConnectionDraft = useReconciliationState((state) => state.updateConnectionDraft);
+  const peerAlertSnapshot = usePeerAlertFailsafeState((state) => state.snapshot);
   const summary = buildAlertEvidenceSummary(snapshot);
   const supervisor = buildBridgeSupervisorSummary(snapshot);
+  const peerAlert = buildPeerAlertOutcomeSummary(peerAlertSnapshot);
 
   useEffect(() => {
     if (
@@ -122,6 +132,22 @@ export function AlertsScreen() {
         <Text style={styles.detail}>{supervisor.tabLabel}</Text>
         <Text style={styles.detail}>{supervisor.backoffLabel}</Text>
         <Text style={styles.detail}>{supervisor.failureLabel}</Text>
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Peer challenge outcome</Text>
+            <Text style={styles.panelTitle}>{peerAlert.statusLabel}</Text>
+          </View>
+          <StatusPill label={peerAlert.gateLabel} tone={peerChallengeTone(peerAlert.blocking)} />
+        </View>
+        <Text style={styles.detail}>{peerAlert.detailLabel}</Text>
+        <Text style={styles.detail}>{peerAlert.sourceLabel}</Text>
+        <Text style={styles.detail}>{peerAlert.timingLabel}</Text>
+        <Text style={styles.detail}>{peerAlert.responseLabel}</Text>
+        <Text style={styles.detail}>{peerAlert.blockerLabel}</Text>
+        {peerAlert.errorLabel ? <Text style={styles.error}>{peerAlert.errorLabel}</Text> : null}
       </View>
 
       <View style={styles.panel}>
