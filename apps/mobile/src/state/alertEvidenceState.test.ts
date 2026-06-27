@@ -346,6 +346,52 @@ test("source policy summary exposes blocked parser, channel, and author proof", 
   assert.equal(summary.blocking, true);
 });
 
+test("source policy summary blocks allowed flags without parser and allowlist proof", () => {
+  const weakProofDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-source-weak-proof",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-1",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        parser_confidence_allowed: true,
+        channel_url_allowed: true,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-source-weak-proof",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [weakProofDecision] })[0];
+  const summary = buildSourcePolicySummary(chain);
+
+  assert.equal(summary.statusLabel, "Source policy blocked");
+  assert.equal(summary.gateLabel, "Blocks alert");
+  assert.equal(summary.sourceLabel, "Chrome Alerts (chrome-alerts) - override matched");
+  assert.equal(summary.confidenceLabel, "Parser proof missing");
+  assert.equal(summary.channelLabel, "Channel allowlist proof missing");
+  assert.equal(summary.authorLabel, "Author allowlist proof missing");
+  assert.equal(summary.blocking, true);
+});
+
 test("source policy summary fails closed when proof is missing", () => {
   const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [] })[0];
   const summary = buildSourcePolicySummary(chain);
@@ -377,8 +423,12 @@ test("queue place summary exposes audited inserted alert and queued trade reques
       parser: { confidence: "high" },
       source: {
         override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
         parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
         channel_url_allowed: true,
+        allowed_author_id_count: 1,
         author_id_allowed: true,
         metadata_policy_passed: true,
       },
@@ -577,7 +627,9 @@ test("alert test evidence summary accepts complete silent audit-only proof witho
         min_parser_confidence: "medium",
         observed_parser_confidence: "high",
         parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
         channel_url_allowed: true,
+        allowed_author_id_count: 1,
         author_id_allowed: true,
         metadata_policy_passed: true,
       },
@@ -640,7 +692,9 @@ test("alert test evidence summary blocks missing event id and stale contract pro
           min_parser_confidence: "medium",
           observed_parser_confidence: "high",
           parser_confidence_allowed: true,
+          allowed_channel_url_count: 1,
           channel_url_allowed: true,
+          allowed_author_id_count: 1,
           author_id_allowed: true,
           metadata_policy_passed: true,
         },
@@ -715,7 +769,9 @@ test("alert test evidence summary blocks physical signal audit channel and autho
         min_parser_confidence: "medium",
         observed_parser_confidence: "high",
         parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
         channel_url_allowed: true,
+        allowed_author_id_count: 1,
         author_id_allowed: true,
         metadata_policy_passed: true,
       },
@@ -784,8 +840,12 @@ test("alert reconciliation trace clears queued alert with exact reconciliation r
       parser: { confidence: "high" },
       source: {
         override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
         parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
         channel_url_allowed: true,
+        allowed_author_id_count: 1,
         author_id_allowed: true,
         metadata_policy_passed: true,
       },

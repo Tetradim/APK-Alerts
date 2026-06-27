@@ -383,8 +383,12 @@ export function buildSourcePolicySummary(chain: AlertEvidenceChain | null | unde
   const passed =
     source.overrideMatched &&
     source.parserConfidenceAllowed &&
+    source.observedParserConfidence !== "none" &&
+    source.minParserConfidence !== "none" &&
     source.channelUrlAllowed &&
+    source.allowedChannelUrlCount > 0 &&
     source.authorIdAllowed &&
+    source.allowedAuthorIdCount > 0 &&
     source.metadataPolicyPassed;
 
   return {
@@ -681,12 +685,18 @@ function formatSourceIdentityLabel(name: string, key: string, overrideMatched: b
 function formatParserPolicyLabel(observed: string, minimum: string, allowed: boolean): string {
   const observedLabel = observed || "none";
   const minimumLabel = minimum || "none";
+  if (observedLabel === "none" || minimumLabel === "none") {
+    return "Parser proof missing";
+  }
   return allowed
     ? `Parser ${observedLabel} >= ${minimumLabel}`
     : `Parser ${observedLabel} below ${minimumLabel}`;
 }
 
 function formatPolicyAllowlistLabel(label: "Channel" | "Author", allowed: boolean, count: number): string {
+  if (count <= 0) {
+    return `${label} allowlist proof missing`;
+  }
   return `${label} ${allowed ? "allowed" : "blocked"} (${count} ${count === 1 ? "allowlist entry" : "allowlist entries"})`;
 }
 
