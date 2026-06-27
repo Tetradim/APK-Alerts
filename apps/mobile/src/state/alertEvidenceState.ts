@@ -233,6 +233,9 @@ function buildAlertContractProofSummary(chain: AlertEvidenceChain): { passed: bo
     if (chain.signal.authorId !== decision.author.id) {
       return { passed: false, label: "Signal/audit author mismatch" };
     }
+    if (!chain.signal.rawText || !decision.rawText) {
+      return { passed: false, label: "Signal/audit raw text missing" };
+    }
     if (chain.signal.rawText && decision.rawText && chain.signal.rawText !== decision.rawText) {
       return { passed: false, label: "Signal/audit raw text mismatch" };
     }

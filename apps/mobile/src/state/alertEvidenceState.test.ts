@@ -948,6 +948,97 @@ test("alert test evidence summary blocks physical raw text mismatch", () => {
   assert.equal(summary.blocking, true);
 });
 
+test("alert test evidence summary blocks physical proof with missing raw text", () => {
+  const variants = [
+    {
+      name: "missing signal raw text",
+      signalRawText: "",
+      decisionRawText: "BTO SPY 500C 6/21 @ 1.25",
+    },
+    {
+      name: "missing audited raw text",
+      signalRawText: "BTO SPY 500C 6/21 @ 1.25",
+      decisionRawText: "",
+    },
+  ];
+
+  for (const variant of variants) {
+    const physicalSignal = normalizeBridgeSignalEvent({
+      event_id: `bus-${variant.name.replaceAll(" ", "-")}`,
+      event_type: "signal.observed",
+      source_bot: "chrome-discord-bridge",
+      created_at: "2026-06-27T17:00:00.000Z",
+      correlation_id: `chrome-message-${variant.name.replaceAll(" ", "-")}`,
+      payload: {
+        contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+        event_id: `chrome-message-${variant.name.replaceAll(" ", "-")}`,
+        channel_id: "chrome-alerts",
+        channel_name: "chrome-alerts",
+        author_id: "mike",
+        author_name: "MikeInvesting",
+        raw_text: variant.signalRawText,
+        parsed: { ticker: "SPY" },
+        parser_metadata: { confidence: "high" },
+        ingestion_result: {
+          status: "accepted",
+          alert_inserted: true,
+          alert_id: `alert-${variant.name.replaceAll(" ", "-")}`,
+          trade_requested: true,
+          trade_request_reason: "risk approved; order intent queued",
+          skip_reason: "",
+        },
+      },
+    });
+    const auditedDecision = normalizeBridgeAlertDecisionEvent({
+      id: `audit-${variant.name.replaceAll(" ", "-")}`,
+      category: "alert_ingestion",
+      action: "bridge_alert_decision",
+      summary: "Chrome bridge alert accepted and queued.",
+      severity: "info",
+      created_at: "2026-06-27T17:00:01.000Z",
+      details: {
+        contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+        event_id: `chrome-message-${variant.name.replaceAll(" ", "-")}`,
+        channel: { id: "chrome-alerts", name: "chrome-alerts" },
+        author: { id: "mike", name: "MikeInvesting" },
+        raw_text: variant.decisionRawText,
+        parsed: { ticker: "SPY" },
+        parser: { confidence: "high" },
+        source: {
+          key: "chrome-alerts",
+          name: "Chrome Alerts",
+          override_matched: true,
+          min_parser_confidence: "medium",
+          observed_parser_confidence: "high",
+          parser_confidence_allowed: true,
+          allowed_channel_url_count: 1,
+          channel_url_allowed: true,
+          allowed_author_id_count: 1,
+          author_id_allowed: true,
+          metadata_policy_passed: true,
+        },
+        decision: {
+          status: "accepted",
+          alert_inserted: true,
+          alert_id: `alert-${variant.name.replaceAll(" ", "-")}`,
+          trade_requested: true,
+          trade_request_reason: "risk approved; order intent queued",
+          skip_reason: "",
+        },
+      },
+    });
+    const chain = buildAlertEvidenceChains({ signals: [physicalSignal], decisions: [auditedDecision] })[0];
+    const summary = buildAlertTestEvidenceSummary(chain);
+
+    assert.equal(summary.modeLabel, "Physical bridge test", variant.name);
+    assert.equal(summary.gateLabel, "Blocks test", variant.name);
+    assert.equal(summary.contractLabel, "Signal/audit raw text missing", variant.name);
+    assert.equal(summary.queueLabel, "Order request queued", variant.name);
+    assert.equal(summary.auditLabel, `Audit audit-${variant.name.replaceAll(" ", "-")}`, variant.name);
+    assert.equal(summary.blocking, true, variant.name);
+  }
+});
+
 test("alert test evidence summary blocks physical observation without audit decision", () => {
   const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [] })[0];
   const summary = buildAlertTestEvidenceSummary(chain);
