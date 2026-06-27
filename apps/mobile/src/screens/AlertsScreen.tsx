@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/StatusPill";
 import {
   buildAlertEvidenceSummary,
   buildBridgeSupervisorSummary,
+  buildSourcePolicySummary,
   useAlertEvidenceState,
 } from "@/state/alertEvidenceState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
@@ -31,6 +32,10 @@ function decisionTone(status: string): "good" | "warn" | "bad" | "neutral" {
 }
 
 function supervisorTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
+  return blocking ? "bad" : "good";
+}
+
+function sourcePolicyTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
   return blocking ? "bad" : "good";
 }
 
@@ -117,33 +122,38 @@ export function AlertsScreen() {
           </Text>
         </View>
       ) : (
-        snapshot.evidence.chains.map((chain) => (
-          <View key={chain.eventId} style={styles.panel}>
-            <View style={styles.panelHeader}>
-              <View style={styles.headerCopy}>
-                <Text style={styles.label}>{chain.channelName || "Unknown source"}</Text>
-                <Text style={styles.panelTitle}>{chain.rawText || chain.eventId}</Text>
+        snapshot.evidence.chains.map((chain) => {
+          const sourcePolicy = buildSourcePolicySummary(chain);
+          return (
+            <View key={chain.eventId} style={styles.panel}>
+              <View style={styles.panelHeader}>
+                <View style={styles.headerCopy}>
+                  <Text style={styles.label}>{chain.channelName || "Unknown source"}</Text>
+                  <Text style={styles.panelTitle}>{chain.rawText || chain.eventId}</Text>
+                </View>
+                <StatusPill label={chain.status} tone={decisionTone(chain.status)} />
               </View>
-              <StatusPill label={chain.status} tone={decisionTone(chain.status)} />
-            </View>
-            <Text style={styles.detail}>Author: {chain.authorName || "unknown"}</Text>
-            <Text style={styles.detail}>Parser confidence: {chain.parserConfidence}</Text>
-            <Text style={styles.detail}>Decision: {chain.latestReason || "No decision reason"}</Text>
-            {chain.decision ? (
-              <Text style={styles.detail}>
-                Source proof: {chain.decision.source.metadataPolicyPassed ? "passed" : "blocked"} -
-                parser {chain.decision.source.parserConfidenceAllowed ? "allowed" : "blocked"},
-                channel {chain.decision.source.channelUrlAllowed ? "allowed" : "blocked"},
-                author {chain.decision.source.authorIdAllowed ? "allowed" : "blocked"}
+              <Text style={styles.detail}>Author: {chain.authorName || "unknown"}</Text>
+              <Text style={styles.detail}>Parser confidence: {chain.parserConfidence}</Text>
+              <Text style={styles.detail}>Decision: {chain.latestReason || "No decision reason"}</Text>
+              <View style={styles.sourcePolicyHeader}>
+                <Text style={styles.label}>Source policy</Text>
+                <StatusPill label={sourcePolicy.gateLabel} tone={sourcePolicyTone(sourcePolicy.blocking)} />
+              </View>
+              <Text style={styles.detail}>{sourcePolicy.statusLabel}</Text>
+              <Text style={styles.detail}>{sourcePolicy.sourceLabel}</Text>
+              <Text style={styles.detail}>{sourcePolicy.confidenceLabel}</Text>
+              <Text style={styles.detail}>{sourcePolicy.channelLabel}</Text>
+              <Text style={styles.detail}>{sourcePolicy.authorLabel}</Text>
+              <Text style={styles.detail}>{sourcePolicy.executionModeLabel}</Text>
+              <Text style={styles.auditText}>
+                event {chain.eventId}
+                {chain.signal?.busEventId ? ` - bus ${chain.signal.busEventId}` : ""}
+                {chain.decision?.auditEventId ? ` - audit ${chain.decision.auditEventId}` : ""}
               </Text>
-            ) : null}
-            <Text style={styles.auditText}>
-              event {chain.eventId}
-              {chain.signal?.busEventId ? ` - bus ${chain.signal.busEventId}` : ""}
-              {chain.decision?.auditEventId ? ` - audit ${chain.decision.auditEventId}` : ""}
-            </Text>
-          </View>
-        ))
+            </View>
+          );
+        })
       )}
     </ScreenFrame>
   );
@@ -152,6 +162,7 @@ export function AlertsScreen() {
 const styles = StyleSheet.create({
   headerRow: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   panelHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  sourcePolicyHeader: { alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between", marginTop: 2 },
   headerCopy: { flex: 1 },
   label: { color: "#94a3b8", fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
   heading: { color: "#f8fafc", fontSize: 24, fontWeight: "900", marginTop: 4 },

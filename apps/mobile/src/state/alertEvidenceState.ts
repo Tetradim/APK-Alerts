@@ -1,4 +1,4 @@
-import { normalizeBridgeHealthPayload } from "@apk-alerts/contracts";
+import { normalizeBridgeHealthPayload, type AlertEvidenceChain } from "@apk-alerts/contracts";
 import {
   fetchRemoteAlertEvidence,
   type RemoteAlertEvidenceResult,
@@ -50,6 +50,17 @@ export interface BridgeSupervisorDisplaySummary {
   tabLabel: string;
   backoffLabel: string;
   failureLabel: string;
+  blocking: boolean;
+}
+
+export interface SourcePolicyDisplaySummary {
+  statusLabel: string;
+  gateLabel: string;
+  sourceLabel: string;
+  confidenceLabel: string;
+  channelLabel: string;
+  authorLabel: string;
+  executionModeLabel: string;
   blocking: boolean;
 }
 
@@ -120,6 +131,44 @@ export function buildBridgeSupervisorSummary(snapshot: AlertEvidenceSnapshot): B
     backoffLabel: formatSupervisorBackoffLabel(supervisor.restartAttempt, supervisor.nextRestartAt, supervisor.state),
     failureLabel: formatSupervisorFailureLabel(supervisor.failures),
     blocking: !healthy,
+  };
+}
+
+export function buildSourcePolicySummary(chain: AlertEvidenceChain | null | undefined): SourcePolicyDisplaySummary {
+  const source = chain?.decision?.source;
+  if (!source) {
+    return {
+      statusLabel: "Source proof missing",
+      gateLabel: "Blocks alert",
+      sourceLabel: "No source policy proof",
+      confidenceLabel: "Parser proof missing",
+      channelLabel: "Channel proof missing",
+      authorLabel: "Author proof missing",
+      executionModeLabel: "Execution mode unknown",
+      blocking: true,
+    };
+  }
+
+  const passed =
+    source.overrideMatched &&
+    source.parserConfidenceAllowed &&
+    source.channelUrlAllowed &&
+    source.authorIdAllowed &&
+    source.metadataPolicyPassed;
+
+  return {
+    statusLabel: passed ? "Source policy passed" : "Source policy blocked",
+    gateLabel: passed ? "Source gate clear" : "Blocks alert",
+    sourceLabel: formatSourceIdentityLabel(source.name, source.key, source.overrideMatched),
+    confidenceLabel: formatParserPolicyLabel(
+      source.observedParserConfidence,
+      source.minParserConfidence,
+      source.parserConfidenceAllowed,
+    ),
+    channelLabel: formatPolicyAllowlistLabel("Channel", source.channelUrlAllowed, source.allowedChannelUrlCount),
+    authorLabel: formatPolicyAllowlistLabel("Author", source.authorIdAllowed, source.allowedAuthorIdCount),
+    executionModeLabel: formatSourceExecutionModeLabel(source.paperOnly, source.requireManualConfirm),
+    blocking: !passed,
   };
 }
 
@@ -303,6 +352,36 @@ function formatSupervisorBackoffLabel(
 
 function formatSupervisorFailureLabel(failures: string[]): string {
   return failures.length > 0 ? `Failures: ${failures.join("; ")}` : "Failures: none";
+}
+
+function formatSourceIdentityLabel(name: string, key: string, overrideMatched: boolean): string {
+  const sourceName = name && key ? `${name} (${key})` : name || key || "Unknown source";
+  return `${sourceName} - ${overrideMatched ? "override matched" : "override missing"}`;
+}
+
+function formatParserPolicyLabel(observed: string, minimum: string, allowed: boolean): string {
+  const observedLabel = observed || "none";
+  const minimumLabel = minimum || "none";
+  return allowed
+    ? `Parser ${observedLabel} >= ${minimumLabel}`
+    : `Parser ${observedLabel} below ${minimumLabel}`;
+}
+
+function formatPolicyAllowlistLabel(label: "Channel" | "Author", allowed: boolean, count: number): string {
+  return `${label} ${allowed ? "allowed" : "blocked"} (${count} ${count === 1 ? "allowlist entry" : "allowlist entries"})`;
+}
+
+function formatSourceExecutionModeLabel(paperOnly: boolean, requireManualConfirm: boolean): string {
+  if (paperOnly && requireManualConfirm) {
+    return "Paper-only source; manual confirmation required";
+  }
+  if (paperOnly) {
+    return "Paper-only source";
+  }
+  if (requireManualConfirm) {
+    return "Manual confirmation required";
+  }
+  return "Auto-live source allowed";
 }
 
 function formatStatusLabel(status: string): string {
