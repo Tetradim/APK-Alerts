@@ -1,24 +1,35 @@
-import type { AlertPeerChallengeEvent, AlertPeerResponseEvent, PeerAlertFingerprint } from "./events";
+import { createEvent, type AlertPeerChallengeEvent, type AlertPeerResponseEvent, type EngineId, type PeerAlertFingerprint } from "./events";
 
 export type AlertPeerFailsafeStatus = "matched" | "missing_response" | "mismatch" | "stale";
 
 export type AlertPeerFailsafeBlockingCode =
   | "peer_response_missing"
+  | "challenge_id_missing"
   | "challenge_id_mismatch"
+  | "lease_id_missing"
   | "lease_id_mismatch"
+  | "target_engine_id_missing"
   | "responder_engine_mismatch"
   | "phone_alert_missing"
+  | "phone_alert_event_id_missing"
+  | "discord_message_id_missing"
   | "discord_message_id_mismatch"
+  | "channel_id_missing"
   | "channel_id_mismatch"
   | "author_id_mismatch"
+  | "source_key_missing"
   | "source_key_mismatch"
+  | "normalized_text_hash_missing"
   | "normalized_text_hash_mismatch"
   | "message_url_mismatch"
   | "remote_observed_at_invalid"
   | "phone_observed_at_invalid"
   | "phone_received_at_invalid"
   | "phone_received_before_observed"
+  | "responded_at_invalid"
+  | "responded_before_received"
   | "response_observed_at_invalid"
+  | "response_observed_before_responded"
   | "response_observed_before_received"
   | "alert_timestamp_skew_exceeded";
 
@@ -40,7 +51,43 @@ export interface AlertPeerFailsafeOptions {
   maxAlertSkewMs?: number;
 }
 
+export interface BuildPhoneAlertPeerResponseEventInput {
+  challenge: AlertPeerChallengeEvent;
+  responseEventId: string;
+  responderEngineId: EngineId;
+  observedAt: string;
+  sequence: number;
+  previousEventId?: string | null;
+  phoneObservedAt: string;
+  phoneReceivedAt: string;
+  respondedAt: string;
+  lastAlert: PeerAlertFingerprint | null;
+}
+
 const DEFAULT_MAX_ALERT_SKEW_MS = 10_000;
+
+export function buildPhoneAlertPeerResponseEvent(
+  input: BuildPhoneAlertPeerResponseEventInput,
+): AlertPeerResponseEvent {
+  return createEvent({
+    id: input.responseEventId,
+    type: "alert.peer.response.v1",
+    sourceEngineId: input.responderEngineId,
+    observedAt: input.observedAt,
+    sequence: input.sequence,
+    previousEventId: input.previousEventId ?? null,
+    idempotencyKey: `peer-alert:response:${input.challenge.payload.challengeId}`,
+    payload: {
+      challengeId: input.challenge.payload.challengeId,
+      leaseId: input.challenge.payload.leaseId,
+      responderEngineId: input.responderEngineId,
+      respondedAt: input.respondedAt,
+      phoneObservedAt: input.phoneObservedAt,
+      phoneReceivedAt: input.phoneReceivedAt,
+      lastAlert: input.lastAlert,
+    },
+  });
+}
 
 export function evaluateAlertPeerResponse(
   challenge: AlertPeerChallengeEvent,
@@ -71,12 +118,14 @@ export function evaluateAlertPeerResponse(
   const remoteObservedAtMs = parseTimestamp(challengePayload.remoteObservedAt);
   const phoneObservedAtMs = parseTimestamp(responsePayload.phoneObservedAt);
   const phoneReceivedAtMs = parseTimestamp(responsePayload.phoneReceivedAt);
+  const respondedAtMs = parseTimestamp(responsePayload.respondedAt);
   const responseObservedAtMs = parseTimestamp(response.observedAt);
   const skewMs = remoteObservedAtMs !== null && phoneObservedAtMs !== null
     ? Math.abs(phoneObservedAtMs - remoteObservedAtMs)
     : null;
   const blockingCodes: AlertPeerFailsafeBlockingCode[] = [];
 
+  validateRequiredChallengeFields(blockingCodes, challengePayload);
   addIf(blockingCodes, responsePayload.challengeId !== challengePayload.challengeId, "challenge_id_mismatch");
   addIf(blockingCodes, responsePayload.leaseId !== challengePayload.leaseId, "lease_id_mismatch");
   addIf(
@@ -89,17 +138,29 @@ export function evaluateAlertPeerResponse(
   if (!phoneAlert) {
     blockingCodes.push("phone_alert_missing");
   } else {
+    validateRequiredPhoneAlertFields(blockingCodes, phoneAlert);
     compareAlertFingerprint(blockingCodes, challengePayload, phoneAlert);
   }
 
   addIf(blockingCodes, remoteObservedAtMs === null, "remote_observed_at_invalid");
   addIf(blockingCodes, phoneObservedAtMs === null, "phone_observed_at_invalid");
   addIf(blockingCodes, phoneReceivedAtMs === null, "phone_received_at_invalid");
+  addIf(blockingCodes, respondedAtMs === null, "responded_at_invalid");
   addIf(blockingCodes, responseObservedAtMs === null, "response_observed_at_invalid");
   addIf(
     blockingCodes,
     phoneObservedAtMs !== null && phoneReceivedAtMs !== null && phoneReceivedAtMs < phoneObservedAtMs,
     "phone_received_before_observed",
+  );
+  addIf(
+    blockingCodes,
+    phoneReceivedAtMs !== null && respondedAtMs !== null && respondedAtMs < phoneReceivedAtMs,
+    "responded_before_received",
+  );
+  addIf(
+    blockingCodes,
+    respondedAtMs !== null && responseObservedAtMs !== null && responseObservedAtMs < respondedAtMs,
+    "response_observed_before_responded",
   );
   addIf(
     blockingCodes,
@@ -126,6 +187,30 @@ export function evaluateAlertPeerResponse(
     skewMs,
     detailLabel: buildDetailLabel(status, challengePayload.challengeId, skewMs),
   };
+}
+
+function validateRequiredChallengeFields(
+  blockingCodes: AlertPeerFailsafeBlockingCode[],
+  challenge: AlertPeerChallengeEvent["payload"],
+): void {
+  addIf(blockingCodes, !challenge.challengeId, "challenge_id_missing");
+  addIf(blockingCodes, !challenge.leaseId, "lease_id_missing");
+  addIf(blockingCodes, !challenge.targetEngineId, "target_engine_id_missing");
+  addIf(blockingCodes, !challenge.discordMessageId, "discord_message_id_missing");
+  addIf(blockingCodes, !challenge.channelId, "channel_id_missing");
+  addIf(blockingCodes, !challenge.sourceKey, "source_key_missing");
+  addIf(blockingCodes, !challenge.normalizedTextSha256, "normalized_text_hash_missing");
+}
+
+function validateRequiredPhoneAlertFields(
+  blockingCodes: AlertPeerFailsafeBlockingCode[],
+  phoneAlert: PeerAlertFingerprint,
+): void {
+  addIf(blockingCodes, !phoneAlert.eventId, "phone_alert_event_id_missing");
+  addIf(blockingCodes, !phoneAlert.discordMessageId, "discord_message_id_missing");
+  addIf(blockingCodes, !phoneAlert.channelId, "channel_id_missing");
+  addIf(blockingCodes, !phoneAlert.sourceKey, "source_key_missing");
+  addIf(blockingCodes, !phoneAlert.normalizedTextSha256, "normalized_text_hash_missing");
 }
 
 function compareAlertFingerprint(
@@ -166,7 +251,10 @@ function classifyStatus(blockingCodes: AlertPeerFailsafeBlockingCode[]): AlertPe
         "phone_observed_at_invalid",
         "phone_received_at_invalid",
         "phone_received_before_observed",
+        "responded_at_invalid",
+        "responded_before_received",
         "response_observed_at_invalid",
+        "response_observed_before_responded",
         "response_observed_before_received",
         "alert_timestamp_skew_exceeded",
       ].includes(code),

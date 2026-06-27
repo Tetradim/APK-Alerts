@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createEvent } from "./events";
-import { evaluateAlertPeerResponse } from "./peerAlertFailsafe";
+import { buildPhoneAlertPeerResponseEvent, evaluateAlertPeerResponse } from "./peerAlertFailsafe";
 
 const challenge = createEvent({
   id: "peer-challenge-1",
@@ -62,6 +62,29 @@ function baseResponsePayload() {
   };
 }
 
+test("phone alert peer response builder echoes challenge identity and last alert copy", () => {
+  const built = buildPhoneAlertPeerResponseEvent({
+    challenge,
+    responseEventId: "peer-response-built",
+    responderEngineId: "phone:pixel-1",
+    observedAt: "2026-06-27T18:00:03.000Z",
+    sequence: 101,
+    phoneObservedAt: "2026-06-27T18:00:02.000Z",
+    phoneReceivedAt: "2026-06-27T18:00:02.250Z",
+    respondedAt: "2026-06-27T18:00:03.000Z",
+    lastAlert: baseResponsePayload().lastAlert,
+  });
+
+  assert.equal(built.id, "peer-response-built");
+  assert.equal(built.type, "alert.peer.response.v1");
+  assert.equal(built.sourceEngineId, "phone:pixel-1");
+  assert.equal(built.idempotencyKey, "peer-alert:response:challenge-1");
+  assert.equal(built.payload.challengeId, "challenge-1");
+  assert.equal(built.payload.leaseId, "lease-phone-1");
+  assert.equal(built.payload.responderEngineId, "phone:pixel-1");
+  assert.equal(built.payload.lastAlert?.sourceKey, "chrome-alerts");
+});
+
 test("peer alert failsafe matches exact phone response within timestamp skew", () => {
   const match = evaluateAlertPeerResponse(challenge, response());
 
@@ -79,6 +102,43 @@ test("peer alert failsafe blocks when phone response is missing", () => {
   assert.equal(missing.blocking, true);
   assert.deepEqual(missing.blockingCodes, ["peer_response_missing"]);
   assert.equal(missing.detailLabel, "Phone did not answer alert challenge challenge-1");
+});
+
+test("peer alert failsafe blocks invalid respondedAt proof", () => {
+  const invalid = evaluateAlertPeerResponse(
+    challenge,
+    response({
+      respondedAt: "not a timestamp",
+    }),
+  );
+
+  assert.equal(invalid.status, "stale");
+  assert.equal(invalid.blocking, true);
+  assert.deepEqual(invalid.blockingCodes, ["responded_at_invalid"]);
+});
+
+test("peer alert failsafe blocks blank required identity proof", () => {
+  const blankSourceChallenge = createEvent({
+    ...challenge,
+    id: "peer-challenge-blank-source",
+    payload: {
+      ...challenge.payload,
+      sourceKey: "",
+    },
+  });
+  const blank = evaluateAlertPeerResponse(
+    blankSourceChallenge,
+    response({
+      lastAlert: {
+        ...baseResponsePayload().lastAlert,
+        sourceKey: "",
+      },
+    }),
+  );
+
+  assert.equal(blank.status, "mismatch");
+  assert.equal(blank.blocking, true);
+  assert.equal(blank.blockingCodes.includes("source_key_missing"), true);
 });
 
 test("peer alert failsafe blocks mismatched source and alert fingerprint", () => {

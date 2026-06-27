@@ -21,3 +21,9 @@ export {
   type RemoteReconciliationResult,
   type RemoteReconciliationSnapshot,
 } from "./remoteReconciliationClient";
+export {
+  normalizePeerAlertFailsafeBaseUrl,
+  requestPhoneAlertPeerResponse,
+  type PeerAlertFailsafeClientConfig,
+  type PeerAlertFailsafeResult,
+} from "./peerAlertFailsafeClient";
