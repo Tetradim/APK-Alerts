@@ -44,11 +44,10 @@ test("default mobile settings summarize phone-primary Tailscale setup", () => {
   assert.deepEqual(snapshot.discordIngestionSettings.routePriority, [
     "bot_engine",
     "webview",
-    "foreground_service",
   ]);
   assert.equal(summary.engineLabel, "Phone then Remote");
   assert.equal(summary.transportLabel, "Tailscale with cloud fallback");
-  assert.equal(summary.discordIngestionLabel, "Bot Engine -> WebView -> Foreground");
+  assert.equal(summary.discordIngestionLabel, "Bot Engine -> WebView");
   assert.equal(summary.notificationsLabel, "Failover and offline alerts on");
 });
 
@@ -77,7 +76,7 @@ test("mobile Discord route digest maps native phone evidence without exposing to
     {
       ...DEFAULT_DISCORD_INGESTION_SETTINGS,
       botToken: "discord-secret-token",
-      routePriority: ["bot_engine", "webview", "foreground_service"],
+      routePriority: ["bot_engine", "webview"],
     },
     {
       ...getDefaultPhoneEngineRuntimeSnapshot(),
@@ -127,7 +126,7 @@ test("settings store hydrates and persists discord ingestion settings through se
     [DISCORD_INGESTION_SETTINGS_STORAGE_KEY]: JSON.stringify({
       ...DEFAULT_DISCORD_INGESTION_SETTINGS,
       botToken: "abc",
-      routePriority: ["webview", "bot_engine", "foreground_service"],
+      routePriority: ["webview", "bot_engine"],
       botEngineEnabled: false,
     }),
   });

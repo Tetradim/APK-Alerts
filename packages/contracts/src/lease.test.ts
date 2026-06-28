@@ -21,13 +21,13 @@ createEvent({
 });
 
 function makeInvalidBroadEvent(type: TradingEventType) {
-  // @ts-expect-error Broad event type must not decouple type from payload.
   return createEvent({
     id: "event-invalid-broad-payload",
     type,
     sourceEngineId: "phone:pixel-1",
     observedAt: "2026-06-27T05:00:00.000Z",
     sequence: 1,
+    // @ts-expect-error Broad event type must not decouple type from payload.
     payload: { unexpected: true },
   });
 }
@@ -249,6 +249,18 @@ test("idempotency keys normalize duplicate order intent identity", () => {
       intent: "BUY",
       externalId: "Message-123",
       contractKey: "SPY-2026-06-30-500-C",
+    }),
+    "discord:buy:message-123:spy-2026-06-30-500-c",
+  );
+});
+
+test("idempotency keys trim every identity part before joining", () => {
+  assert.equal(
+    buildIdempotencyKey({
+      source: "discord",
+      intent: " BUY ",
+      externalId: " Message-123 ",
+      contractKey: " SPY-2026-06-30-500-C ",
     }),
     "discord:buy:message-123:spy-2026-06-30-500-c",
   );

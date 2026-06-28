@@ -9,10 +9,13 @@ import java.io.OutputStreamWriter
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.time.Instant
 
 object PeerAlertChallengeServer {
   const val PORT = 42117
   private const val PATH = "/api/peer-alert/challenges"
+  private const val CLIENT_READ_TIMEOUT_MS = 5_000
+  private const val MAX_BODY_BYTES = 65_536
 
   @Volatile private var running = false
   private var serverSocket: ServerSocket? = null
@@ -45,6 +48,7 @@ object PeerAlertChallengeServer {
 
   private fun runServer(context: Context) {
     try {
+      // Bind all interfaces (0.0.0.0) so Tailscale and same-Wi-Fi remotes can challenge the phone.
       ServerSocket(PORT).use { socket ->
         serverSocket = socket
         socket.soTimeout = 1_000
@@ -72,6 +76,7 @@ object PeerAlertChallengeServer {
   }
 
   private fun handleClient(socket: Socket) {
+    socket.soTimeout = CLIENT_READ_TIMEOUT_MS
     val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
     val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
     val requestLine = reader.readLine().orEmpty()
@@ -84,7 +89,12 @@ object PeerAlertChallengeServer {
     val method = requestParts[0].uppercase()
     val path = requestParts[1].substringBefore("?")
     val headers = readHeaders(reader)
-    val body = readBody(reader, headers["content-length"]?.toIntOrNull() ?: 0)
+    val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
+    if (contentLength > MAX_BODY_BYTES) {
+      writeJson(writer, 413, JSONObject().put("error", "Peer alert request body is too large."))
+      return
+    }
+    val body = readBody(reader, contentLength.coerceAtLeast(0))
 
     if (path != PATH) {
       writeJson(writer, 404, JSONObject().put("error", "Peer alert endpoint not found."))
@@ -176,11 +186,9 @@ object PeerAlertChallengeServer {
       400 -> "Bad Request"
       404 -> "Not Found"
       405 -> "Method Not Allowed"
+      413 -> "Payload Too Large"
       else -> "Error"
     }
 
-  private fun nowIso(): String =
-    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
-      timeZone = java.util.TimeZone.getTimeZone("UTC")
-    }.format(java.util.Date())
+  private fun nowIso(): String = Instant.now().toString()
 }

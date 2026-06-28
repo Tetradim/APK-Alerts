@@ -21,6 +21,8 @@ test("windows installer script exposes unattended tailscale and pairing bootstra
   assert.match(script, /apiPreflight/);
   assert.match(script, /repairCommand/);
   assert.match(script, /MOBILE_CONSOLIDATION_API_KEY/);
+  assert.match(script, /Tailscale did not report a phone-reachable IP/i);
+  assert.doesNotMatch(script, /127\.0\.0\.1/);
   assert.doesNotMatch(script, /mobile-api-key|secret-value|demo/i);
 });
 

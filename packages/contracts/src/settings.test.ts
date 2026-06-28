@@ -125,14 +125,13 @@ test("default discord ingestion settings enable all local routes with bot engine
   assert.deepEqual(DEFAULT_DISCORD_INGESTION_SETTINGS.routePriority, [
     "bot_engine",
     "webview",
-    "foreground_service",
   ]);
   assert.equal(DEFAULT_DISCORD_INGESTION_SETTINGS.webViewEnabled, true);
   assert.equal(DEFAULT_DISCORD_INGESTION_SETTINGS.botEngineEnabled, true);
   assert.equal(DEFAULT_DISCORD_INGESTION_SETTINGS.foregroundServiceEnabled, true);
   assert.equal(
     buildDiscordIngestionPriorityLabel(DEFAULT_DISCORD_INGESTION_SETTINGS),
-    "Bot Engine -> WebView -> Foreground",
+    "Bot Engine -> WebView",
   );
 });
 
@@ -142,7 +141,7 @@ test("discord ingestion settings normalize malformed route priorities and token 
     guildId: " guild ",
     channelAllowlist: " 111, 222 ",
     authorAllowlist: " bot-a ",
-    routePriority: ["webview", "webview", "bad-route"],
+    routePriority: ["webview", "webview", "foreground_service", "bad-route"],
     webViewEnabled: "yes",
     botEngineEnabled: false,
     foregroundServiceEnabled: false,
@@ -152,11 +151,11 @@ test("discord ingestion settings normalize malformed route priorities and token 
   assert.equal(settings.guildId, "guild");
   assert.equal(settings.channelAllowlist, "111, 222");
   assert.equal(settings.authorAllowlist, "bot-a");
-  assert.deepEqual(settings.routePriority, ["webview", "bot_engine", "foreground_service"]);
+  assert.deepEqual(settings.routePriority, ["webview", "bot_engine"]);
   assert.equal(settings.webViewEnabled, true);
   assert.equal(settings.botEngineEnabled, false);
   assert.equal(settings.foregroundServiceEnabled, false);
-  assert.equal(buildDiscordIngestionPriorityLabel(settings), "WebView -> Bot Engine -> Foreground");
+  assert.equal(buildDiscordIngestionPriorityLabel(settings), "WebView -> Bot Engine");
 });
 
 test("discord ingestion readiness follows route priority without treating keepalive as ingestion", () => {
@@ -164,7 +163,7 @@ test("discord ingestion readiness follows route priority without treating keepal
     {
       ...DEFAULT_DISCORD_INGESTION_SETTINGS,
       botToken: "token",
-      routePriority: ["bot_engine", "webview", "foreground_service"],
+      routePriority: ["bot_engine", "webview"],
     },
     {
       botGatewayReady: true,
@@ -176,7 +175,7 @@ test("discord ingestion readiness follows route priority without treating keepal
     {
       ...DEFAULT_DISCORD_INGESTION_SETTINGS,
       botEngineEnabled: false,
-      routePriority: ["webview", "foreground_service", "bot_engine"],
+      routePriority: ["webview", "bot_engine"],
     },
     {
       botGatewayReady: false,
@@ -197,7 +196,7 @@ test("discord ingestion readiness falls through to the next enabled ready route"
     {
       ...DEFAULT_DISCORD_INGESTION_SETTINGS,
       botToken: "token",
-      routePriority: ["bot_engine", "webview", "foreground_service"],
+      routePriority: ["bot_engine", "webview"],
     },
     {
       botGatewayReady: false,
@@ -220,7 +219,7 @@ test("discord ingestion audit digest records ordered route blockers without secr
       guildId: "guild-1",
       channelAllowlist: "channel-1, channel-2",
       authorAllowlist: "author-1",
-      routePriority: ["bot_engine", "webview", "foreground_service"],
+      routePriority: ["bot_engine", "webview"],
     },
     {
       botGatewayReady: false,
@@ -229,22 +228,21 @@ test("discord ingestion audit digest records ordered route blockers without secr
     },
   );
 
-  assert.equal(digest.priorityLabel, "Bot Engine -> WebView -> Foreground");
+  assert.equal(digest.priorityLabel, "Bot Engine -> WebView");
   assert.equal(digest.gateLabel, "Discord route blocked");
   assert.equal(digest.activeRouteLabel, "Bot Engine");
   assert.equal(digest.botTokenConfigured, true);
   assert.equal(digest.guildConfigured, true);
   assert.equal(digest.channelAllowlistConfigured, true);
   assert.equal(digest.authorAllowlistConfigured, true);
-  assert.deepEqual(digest.enabledRouteLabels, ["Bot Engine", "WebView", "Foreground"]);
+  assert.deepEqual(digest.enabledRouteLabels, ["Bot Engine", "WebView"]);
   assert.deepEqual(digest.readyRouteLabels, []);
   assert.deepEqual(digest.blockingRouteLabels, [
     "Bot Engine: Bot Engine Gateway not ready.",
     "WebView: WebView session has not produced alert evidence.",
-    "Foreground: Foreground keepalive is active but is not an ingestion source.",
   ]);
-  assert.equal(digest.routeRows[2]?.ready, false);
-  assert.equal(digest.routeRows[2]?.detailLabel, "Foreground keepalive is active but is not an ingestion source.");
+  assert.equal(digest.routeRows.length, 2);
+  assert.equal(digest.evidenceLabels[2], "Keepalive: active");
   assert.equal(digest.blocking, true);
   assert.doesNotMatch(JSON.stringify(digest), /secret-token/);
 });
@@ -255,7 +253,7 @@ test("discord ingestion audit digest records ready fallback route and disabled r
       ...DEFAULT_DISCORD_INGESTION_SETTINGS,
       botEngineEnabled: false,
       botToken: "secret-token",
-      routePriority: ["bot_engine", "webview", "foreground_service"],
+      routePriority: ["bot_engine", "webview"],
     },
     {
       botGatewayReady: false,

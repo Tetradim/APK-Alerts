@@ -61,6 +61,7 @@ class PhoneEngineRuntimeModule(
           },
         ),
       )
+      DiscordGatewayWorker.reconfigure(reactContext)
       promise.resolve(PhoneEngineRuntimeRegistry.snapshot(reactContext))
     } catch (error: Exception) {
       promise.reject("PHONE_ENGINE_DISCORD_CONFIG_FAILED", error)
@@ -85,14 +86,19 @@ class PhoneEngineRuntimeModule(
 
   private fun routePriorityValue(routePriority: ReadableArray?): String {
     if (routePriority == null) {
-      return "bot_engine,webview,foreground_service"
+      return "bot_engine,webview"
     }
 
     val values = mutableListOf<String>()
     for (index in 0 until routePriority.size()) {
       val value = routePriority.getString(index)
-      if (!value.isNullOrBlank()) {
+      if (value == "bot_engine" || value == "webview") {
         values.add(value)
+      }
+    }
+    listOf("bot_engine", "webview").forEach { route ->
+      if (!values.contains(route)) {
+        values.add(route)
       }
     }
     return values.joinToString(",")

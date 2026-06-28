@@ -84,13 +84,13 @@ test("secure persistence saves and normalizes discord ingestion settings includi
   await saveDiscordIngestionSettings(storage, {
     ...DEFAULT_DISCORD_INGESTION_SETTINGS,
     botToken: " bot-token ",
-    routePriority: ["webview", "bot_engine", "foreground_service"],
+    routePriority: ["webview", "bot_engine"],
     foregroundServiceEnabled: false,
   });
   const loaded = await loadDiscordIngestionSettings(storage);
 
   assert.equal(loaded?.botToken, "bot-token");
-  assert.deepEqual(loaded?.routePriority, ["webview", "bot_engine", "foreground_service"]);
+  assert.deepEqual(loaded?.routePriority, ["webview", "bot_engine"]);
   assert.equal(loaded?.foregroundServiceEnabled, false);
   assert.equal(JSON.parse(storage.values[DISCORD_INGESTION_SETTINGS_STORAGE_KEY]).botToken, "bot-token");
 });

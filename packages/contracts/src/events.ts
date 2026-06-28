@@ -114,6 +114,38 @@ export interface OrderIntentPayload {
   quantity: number;
 }
 
+export interface BrokerOrderUpdatePayload {
+  broker: "alpaca" | "tradier" | "unknown";
+  brokerOrderId: string;
+  clientOrderId: string | null;
+  status: "queued" | "submitted" | "partially_filled" | "filled" | "cancelled" | "rejected" | "unknown";
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  filledQuantity: number;
+  averageFillPrice: number | null;
+  updatedAt: string;
+}
+
+export interface PositionReconciledPayload {
+  broker: "alpaca" | "tradier" | "unknown";
+  positionId: string;
+  symbol: string;
+  quantity: number;
+  averageEntryPrice: number | null;
+  marketValue: number | null;
+  reconciledAt: string;
+  open: boolean;
+  protectedByOco: boolean;
+}
+
+export interface OperatorNotificationPayload {
+  severity: "info" | "warning" | "critical";
+  code: string;
+  message: string;
+  actionLabel: string | null;
+}
+
 export type EngineHealthEvent = BaseEvent<"engine.health.v1", EngineHealthPayload>;
 export type TransportHealthEvent = BaseEvent<"transport.health.v1", TransportHealthPayload>;
 export type LeaseEvent = BaseEvent<
@@ -138,9 +170,9 @@ export type AnyTradingEvent =
   | AlertPeerResponseEvent
   | AlertParseDecisionEvent
   | OrderIntentEvent
-  | BaseEvent<"broker.order.update.v1", Record<string, unknown>>
-  | BaseEvent<"position.reconciled.v1", Record<string, unknown>>
-  | BaseEvent<"operator.notification.v1", Record<string, unknown>>
+  | BaseEvent<"broker.order.update.v1", BrokerOrderUpdatePayload>
+  | BaseEvent<"position.reconciled.v1", PositionReconciledPayload>
+  | BaseEvent<"operator.notification.v1", OperatorNotificationPayload>
   | BaseEvent<"emergency.stop.v1", { reason: string }>;
 
 export interface TradingEventPayloadByType {
@@ -156,9 +188,9 @@ export interface TradingEventPayloadByType {
   "alert.peer.response.v1": AlertPeerResponsePayload;
   "alert.parse.decision.v1": AlertParseDecisionPayload;
   "order.intent.v1": OrderIntentPayload;
-  "broker.order.update.v1": Record<string, unknown>;
-  "position.reconciled.v1": Record<string, unknown>;
-  "operator.notification.v1": Record<string, unknown>;
+  "broker.order.update.v1": BrokerOrderUpdatePayload;
+  "position.reconciled.v1": PositionReconciledPayload;
+  "operator.notification.v1": OperatorNotificationPayload;
   "emergency.stop.v1": { reason: string };
 }
 
@@ -206,6 +238,7 @@ export function buildIdempotencyKey(parts: {
     parts.externalId,
     parts.contractKey ?? "none",
   ]
+    .map((part) => part.trim())
     .join(":")
     .trim()
     .toLowerCase();

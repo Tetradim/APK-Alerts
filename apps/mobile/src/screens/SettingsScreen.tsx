@@ -22,42 +22,30 @@ const transportOptions = [
 ] as const;
 
 type DiscordPriorityPreset =
-  | "bot_web_foreground"
-  | "web_bot_foreground"
-  | "web_foreground_bot"
-  | "foreground_bot_web";
+  | "bot_web"
+  | "web_bot";
 
 const discordPriorityOptions = [
-  { label: "Bot/Web/FG", value: "bot_web_foreground" },
-  { label: "Web/Bot/FG", value: "web_bot_foreground" },
-  { label: "Web/FG/Bot", value: "web_foreground_bot" },
-  { label: "FG/Bot/Web", value: "foreground_bot_web" },
+  { label: "Bot then Web", value: "bot_web" },
+  { label: "Web then Bot", value: "web_bot" },
 ] as const;
 
 function routePriorityForPreset(preset: DiscordPriorityPreset): DiscordIngestionRoute[] {
   switch (preset) {
-    case "bot_web_foreground":
-      return ["bot_engine", "webview", "foreground_service"];
-    case "web_bot_foreground":
-      return ["webview", "bot_engine", "foreground_service"];
-    case "web_foreground_bot":
-      return ["webview", "foreground_service", "bot_engine"];
-    case "foreground_bot_web":
-      return ["foreground_service", "bot_engine", "webview"];
+    case "bot_web":
+      return ["bot_engine", "webview"];
+    case "web_bot":
+      return ["webview", "bot_engine"];
   }
 }
 
 function presetForRoutePriority(priority: DiscordIngestionRoute[]): DiscordPriorityPreset {
   const key = priority.join(",");
   switch (key) {
-    case "webview,bot_engine,foreground_service":
-      return "web_bot_foreground";
-    case "webview,foreground_service,bot_engine":
-      return "web_foreground_bot";
-    case "foreground_service,bot_engine,webview":
-      return "foreground_bot_web";
+    case "webview,bot_engine":
+      return "web_bot";
     default:
-      return "bot_web_foreground";
+      return "bot_web";
   }
 }
 

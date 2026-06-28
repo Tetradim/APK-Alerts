@@ -1,6 +1,6 @@
 export type EnginePriority = "phone_then_remote" | "remote_then_phone";
 export type TransportPreference = "tailscale_first" | "cloud_first";
-export type DiscordIngestionRoute = "bot_engine" | "webview" | "foreground_service";
+export type DiscordIngestionRoute = "bot_engine" | "webview";
 
 export interface FailoverSettings {
   enginePriority: EnginePriority;
@@ -82,7 +82,6 @@ export const DEFAULT_FAILOVER_SETTINGS: FailoverSettings = {
 export const DEFAULT_DISCORD_ROUTE_PRIORITY: DiscordIngestionRoute[] = [
   "bot_engine",
   "webview",
-  "foreground_service",
 ];
 
 export const DEFAULT_DISCORD_INGESTION_SETTINGS: DiscordIngestionSettings = {
@@ -117,7 +116,7 @@ function isTransportPreference(value: unknown): value is TransportPreference {
 }
 
 function isDiscordIngestionRoute(value: unknown): value is DiscordIngestionRoute {
-  return value === "bot_engine" || value === "webview" || value === "foreground_service";
+  return value === "bot_engine" || value === "webview";
 }
 
 function normalizeString(value: unknown): string {
@@ -302,7 +301,7 @@ export function buildDiscordIngestionAuditDigest(
     evidenceLabels: [
       evidence.botGatewayReady ? "Bot Gateway: ready" : "Bot Gateway: waiting",
       evidence.webViewSessionReady ? "WebView: alert proof ready" : "WebView: alert proof waiting",
-      evidence.foregroundServiceActive ? "Foreground: active" : "Foreground: inactive",
+      evidence.foregroundServiceActive ? "Keepalive: active" : "Keepalive: inactive",
     ],
     botTokenConfigured: normalized.botToken.length > 0,
     guildConfigured: normalized.guildId.length > 0,
@@ -337,8 +336,6 @@ function discordRouteLabel(route: DiscordIngestionRoute): string {
       return "Bot Engine";
     case "webview":
       return "WebView";
-    case "foreground_service":
-      return "Foreground";
   }
 }
 
@@ -351,8 +348,6 @@ function discordRouteEnabled(
       return settings.botEngineEnabled;
     case "webview":
       return settings.webViewEnabled;
-    case "foreground_service":
-      return settings.foregroundServiceEnabled;
   }
 }
 
@@ -366,8 +361,6 @@ function discordRouteReady(
       return settings.botToken.length > 0 && evidence.botGatewayReady === true;
     case "webview":
       return evidence.webViewSessionReady === true;
-    case "foreground_service":
-      return false;
   }
 }
 
@@ -386,9 +379,5 @@ function discordRouteDetailLabel(
       return evidence.webViewSessionReady
         ? "WebView session produced alert evidence."
         : "WebView session has not produced alert evidence.";
-    case "foreground_service":
-      return evidence.foregroundServiceActive
-        ? "Foreground keepalive is active but is not an ingestion source."
-        : "Foreground keepalive is not active and is not an ingestion source.";
   }
 }

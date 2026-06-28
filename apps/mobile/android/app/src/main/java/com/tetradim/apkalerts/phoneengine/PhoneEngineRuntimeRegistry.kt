@@ -5,10 +5,8 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableMap
 import org.json.JSONObject
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
 import java.util.Locale
-import java.util.TimeZone
 
 object PhoneEngineRuntimeRegistry {
   private const val PREFERENCES_NAME = "apk_alerts_phone_engine_runtime"
@@ -26,11 +24,7 @@ object PhoneEngineRuntimeRegistry {
   private const val KEY_DISCORD_AUTHOR_ALLOWLIST = "discord_author_allowlist"
   private const val ROUTE_BOT_ENGINE = "bot_engine"
   private const val ROUTE_WEBVIEW = "webview"
-  private const val ROUTE_FOREGROUND_SERVICE = "foreground_service"
-
-  private val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
-    timeZone = TimeZone.getTimeZone("UTC")
-  }
+  private const val NATIVE_GATEWAY_QUEUELESS_ALERT_ID = ""
 
   private var nativeRuntimeAvailable = true
   private var serviceEnabled = false
@@ -74,6 +68,9 @@ object PhoneEngineRuntimeRegistry {
       "Foreground service stopped."
     }
   }
+
+  @Synchronized
+  fun isForegroundServiceActive(): Boolean = foregroundServiceActive
 
   @Synchronized
   fun shouldRestartAfterBoot(context: Context): Boolean {
@@ -206,7 +203,8 @@ object PhoneEngineRuntimeRegistry {
       .put("sourceKey", discordLastAlertChannelId)
       .put("parserConfidence", "none")
       .put("decisionStatus", "unknown")
-      .put("queuedAlertId", "")
+      // Native gateway observation has not gone through the JS queue yet.
+      .put("queuedAlertId", NATIVE_GATEWAY_QUEUELESS_ALERT_ID)
 
     return JSONObject()
       .put("observedAt", discordLastAlertObservedAt)
@@ -275,18 +273,18 @@ object PhoneEngineRuntimeRegistry {
   private fun discordRoutePriority(preferences: android.content.SharedPreferences): List<String> {
     val stored = preferences.getString(
       KEY_DISCORD_ROUTE_PRIORITY,
-      "$ROUTE_BOT_ENGINE,$ROUTE_WEBVIEW,$ROUTE_FOREGROUND_SERVICE",
+      "$ROUTE_BOT_ENGINE,$ROUTE_WEBVIEW",
     ).orEmpty()
     val normalized = mutableListOf<String>()
     stored.split(",")
       .map { it.trim() }
-      .filter { it == ROUTE_BOT_ENGINE || it == ROUTE_WEBVIEW || it == ROUTE_FOREGROUND_SERVICE }
+      .filter { it == ROUTE_BOT_ENGINE || it == ROUTE_WEBVIEW }
       .forEach { route ->
         if (!normalized.contains(route)) {
           normalized.add(route)
         }
       }
-    listOf(ROUTE_BOT_ENGINE, ROUTE_WEBVIEW, ROUTE_FOREGROUND_SERVICE).forEach { route ->
+    listOf(ROUTE_BOT_ENGINE, ROUTE_WEBVIEW).forEach { route ->
       if (!normalized.contains(route)) {
         normalized.add(route)
       }
@@ -302,7 +300,6 @@ object PhoneEngineRuntimeRegistry {
         botEnabled && botTokenPresent && discordGatewayConnected && discordIngestionEvidenceReady
       }
       ROUTE_WEBVIEW -> false
-      ROUTE_FOREGROUND_SERVICE -> false
       else -> false
     }
   }
@@ -310,9 +307,7 @@ object PhoneEngineRuntimeRegistry {
   private fun preferences(context: Context) =
     context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
-  private fun nowIso(): String = synchronized(isoFormatter) {
-    isoFormatter.format(Date())
-  }
+  private fun nowIso(): String = Instant.now().toString()
 
   private fun discordMessageUrl(guildId: String, channelId: String, messageId: String): String {
     if (channelId.isBlank() || messageId.isBlank()) {

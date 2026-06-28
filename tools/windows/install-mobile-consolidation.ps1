@@ -268,7 +268,11 @@ $tailscaleStatus = Connect-TailscaleIfConfigured
 $firewallOpen = Ensure-MobileFirewallRule -Port $ApiPort
 $envPath = Write-RemoteEnvironment -RepoRoot $repoRoot -Port $ApiPort -ApiKey $MobileApiKey
 
-$remoteHost = if ($tailscaleStatus.ip) { $tailscaleStatus.ip } else { "127.0.0.1" }
+if (-not $tailscaleStatus.ip) {
+    throw "Tailscale did not report a phone-reachable IP. Log in to Tailscale, confirm this PC appears in your tailnet, then rerun setup."
+}
+
+$remoteHost = $tailscaleStatus.ip
 $remoteApiUrl = "http://$remoteHost`:$ApiPort/api"
 $apiPreflight = Test-MobileApiPreflight -Port $ApiPort -RemoteApiUrl $remoteApiUrl -FirewallOpen $firewallOpen
 $pairingPackage = Write-PairingPackage -Root $InstallRoot -RemoteApiUrl $remoteApiUrl -ApiKey $MobileApiKey

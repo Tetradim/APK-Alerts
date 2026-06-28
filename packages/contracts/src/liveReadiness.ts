@@ -350,7 +350,7 @@ function stringArray(input: unknown): string[] {
 }
 
 function nonNegativeInteger(input: unknown): number {
-  return typeof input === "number" && Number.isInteger(input) && input > 0 ? input : 0;
+  return typeof input === "number" && Number.isInteger(input) && input >= 0 ? input : 0;
 }
 
 function finiteNumberOrNull(input: unknown): number | null {
