@@ -5,6 +5,7 @@ import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import { buildExitProtectionEvidenceSummary, useLiveReadinessState } from "@/state/liveReadinessState";
 import {
+  buildReconciliationAuditDigest,
   buildOrderLifecycleEvidenceSummary,
   buildReconciliationSummary,
   useReconciliationState,
@@ -113,6 +114,7 @@ export function PositionsScreen() {
       ) : (
         reconciliationSnapshot.remote.rows.slice(0, 12).map((row) => {
           const lifecycle = buildOrderLifecycleEvidenceSummary(row);
+          const digest = buildReconciliationAuditDigest(row);
           return (
             <View key={`${row.alertId}-${row.tradeId}-${row.positionId}`} style={styles.panel}>
               <View style={styles.panelHeader}>
@@ -126,6 +128,10 @@ export function PositionsScreen() {
               <Text style={styles.detail}>Order: {row.orderId || "none"}</Text>
               <Text style={styles.detail}>Position: {row.positionId || "none"} - {row.positionStatus || "unknown"}</Text>
               <Text style={styles.detail}>Mode: {row.simulated ? "paper/simulated" : "real"}</Text>
+              <Text style={styles.auditText}>
+                Digest alert {digest.alertId || "missing"} - trade {digest.tradeId || "missing"} - lifecycle{" "}
+                {digest.lifecycleGateLabel}
+              </Text>
               <View style={styles.lifecyclePanel}>
                 <View style={styles.panelHeader}>
                   <View style={styles.headerCopy}>
@@ -172,6 +178,7 @@ const styles = StyleSheet.create({
   value: { color: "#f8fafc", fontSize: 15, fontWeight: "900", lineHeight: 21, marginTop: 4 },
   detail: { color: "#cbd5e1", fontSize: 13, lineHeight: 19 },
   footerDetail: { flex: 1 },
+  auditText: { color: "#94a3b8", fontSize: 12, lineHeight: 18 },
   error: { color: "#fca5a5", fontSize: 13, fontWeight: "800" },
   lifecyclePanel: {
     borderTopColor: "#334155",

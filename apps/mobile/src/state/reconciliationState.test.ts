@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeReconciliationPayload, summarizeReconciliationRows } from "@apk-alerts/contracts";
 import {
+  buildReconciliationAuditDigest,
   buildOrderLifecycleEvidenceSummary,
   buildReconciliationSummary,
   createReconciliationStore,
@@ -83,6 +84,45 @@ test("order lifecycle evidence clears filled real trade with broker and position
   assert.equal(summary.items.find((item) => item.key === "fill_terminal")?.statusLabel, "Fill terminal");
   assert.equal(summary.items.find((item) => item.key === "position")?.statusLabel, "Position linked");
   assert.equal(summary.items.find((item) => item.key === "attention")?.statusLabel, "No attention reason");
+});
+
+test("reconciliation audit digest preserves broker proof and lifecycle blockers", () => {
+  const [row] = normalizeReconciliationPayload([
+    {
+      alert_id: "alert-pending",
+      ticker: "SPY",
+      expiration: "2026-06-21",
+      strike: 500,
+      option_type: "CALL",
+      processed: true,
+      trade_requested: true,
+      trade_executed: false,
+      trade_id: "trade-pending",
+      trade_status: "pending",
+      order_id: "order-pending",
+      position_id: "",
+      simulated: false,
+      attention_reason: "order pending fill",
+    },
+  ]);
+  assert.ok(row);
+
+  const digest = buildReconciliationAuditDigest(row);
+
+  assert.equal(digest.alertId, "alert-pending");
+  assert.equal(digest.contractKey, "SPY-2026-06-21-500-CALL");
+  assert.equal(digest.tradeId, "trade-pending");
+  assert.equal(digest.orderId, "order-pending");
+  assert.equal(digest.positionId, "");
+  assert.equal(digest.modeLabel, "real");
+  assert.equal(digest.lifecycleGateLabel, "Lifecycle blocked");
+  assert.equal(digest.liveBlocking, true);
+  assert.equal(digest.blocking, true);
+  assert.deepEqual(digest.blockingLabels, [
+    "Fill not terminal",
+    "Position pending",
+    "Live blocker",
+  ]);
 });
 
 test("order lifecycle evidence blocks pending live order with attention", () => {

@@ -58,6 +58,25 @@ export interface OrderLifecycleEvidenceSummary {
   items: OrderLifecycleEvidenceItem[];
 }
 
+export interface ReconciliationAuditDigest {
+  alertId: string;
+  ticker: string;
+  contractKey: string;
+  tradeId: string;
+  tradeStatus: string;
+  orderId: string;
+  positionId: string;
+  positionStatus: string;
+  modeLabel: string;
+  lifecycleGateLabel: string;
+  lifecycleReadyLabel: string;
+  lifecycleBlockingLabel: string;
+  liveBlocking: boolean;
+  blocking: boolean;
+  attentionReason: string;
+  blockingLabels: string[];
+}
+
 export interface ReconciliationState {
   snapshot: ReconciliationSnapshot;
   activeRequestId: number;
@@ -186,6 +205,30 @@ export function buildOrderLifecycleEvidenceSummary(row: ReconciliationRow): Orde
     blockingCountLabel: blockingCount === 0 ? "No lifecycle blockers" : `${blockingCount} lifecycle blocker(s)`,
     blocking: blockingCount > 0,
     items,
+  };
+}
+
+export function buildReconciliationAuditDigest(row: ReconciliationRow): ReconciliationAuditDigest {
+  const lifecycle = buildOrderLifecycleEvidenceSummary(row);
+  return {
+    alertId: row.alertId,
+    ticker: row.ticker,
+    contractKey: row.contractKey,
+    tradeId: row.tradeId,
+    tradeStatus: row.tradeStatus,
+    orderId: row.orderId,
+    positionId: row.positionId,
+    positionStatus: row.positionStatus,
+    modeLabel: row.simulated ? "paper/simulated" : "real",
+    lifecycleGateLabel: lifecycle.gateLabel,
+    lifecycleReadyLabel: lifecycle.readyCountLabel,
+    lifecycleBlockingLabel: lifecycle.blockingCountLabel,
+    liveBlocking: row.liveBlocking,
+    blocking: lifecycle.blocking,
+    attentionReason: row.attentionReason,
+    blockingLabels: lifecycle.items
+      .filter((item) => item.blocking)
+      .map((item) => item.statusLabel),
   };
 }
 

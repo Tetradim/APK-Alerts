@@ -316,3 +316,37 @@ test("mobile support bundle includes redacted alert audit digests", () => {
   assert.match(bundle.alertEvidence.latestDigest?.rawTextFingerprint ?? "", /^fnv1a32:[0-9a-f]{8}$/);
   assert.doesNotMatch(serialized, /BTO SPY/);
 });
+
+test("mobile support bundle includes reconciliation audit digests", () => {
+  const input = buildDefaultSupportInput();
+  input.reconciliation.remote.rows = normalizeReconciliationPayload([
+    {
+      alert_id: "alert-reconcile-digest",
+      ticker: "AAPL",
+      expiration: "2026-07-17",
+      strike: 210,
+      option_type: "CALL",
+      processed: true,
+      trade_requested: true,
+      trade_executed: true,
+      trade_id: "trade-reconcile-digest",
+      trade_status: "filled",
+      order_id: "order-reconcile-digest",
+      position_id: "position-reconcile-digest",
+      position_status: "open",
+      simulated: false,
+      attention_reason: "",
+    },
+  ]);
+
+  const bundle = buildMobileSupportBundle(input);
+
+  assert.equal(bundle.reconciliation.latestDigest?.alertId, "alert-reconcile-digest");
+  assert.equal(bundle.reconciliation.latestDigest?.contractKey, "AAPL-2026-07-17-210-CALL");
+  assert.equal(bundle.reconciliation.latestDigest?.tradeId, "trade-reconcile-digest");
+  assert.equal(bundle.reconciliation.latestDigest?.orderId, "order-reconcile-digest");
+  assert.equal(bundle.reconciliation.latestDigest?.positionId, "position-reconcile-digest");
+  assert.equal(bundle.reconciliation.latestDigest?.lifecycleGateLabel, "Lifecycle clear");
+  assert.equal(bundle.reconciliation.latestDigest?.blocking, false);
+  assert.equal(bundle.reconciliation.digests.length, 1);
+});

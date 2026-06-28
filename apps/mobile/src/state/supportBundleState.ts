@@ -17,7 +17,11 @@ import {
   buildPhoneEngineRuntimeSummary,
   type PhoneEngineRuntimeSnapshot,
 } from "./phoneEngineRuntimeState";
-import type { ReconciliationSnapshot } from "./reconciliationState";
+import {
+  buildReconciliationAuditDigest,
+  type ReconciliationAuditDigest,
+  type ReconciliationSnapshot,
+} from "./reconciliationState";
 import type { RemoteEngineSnapshot } from "./remoteEngineState";
 import {
   buildSetupAutomationSummary,
@@ -104,6 +108,8 @@ export interface MobileSupportBundle {
     rowCount: number;
     unresolvedCount: number;
     unresolvedReasons: string[];
+    latestDigest: ReconciliationAuditDigest | null;
+    digests: ReconciliationAuditDigest[];
   };
   setupAssistant: {
     summary: ReturnType<typeof buildSetupAutomationSummary>;
@@ -224,6 +230,9 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
     .slice(0, 10)
     .map((chain) => buildAlertAuditDigest(chain, input.reconciliation.remote.rows));
   const reconciliationSummary = input.reconciliation.remote.summary;
+  const reconciliationDigests = input.reconciliation.remote.rows
+    .slice(0, 10)
+    .map(buildReconciliationAuditDigest);
   const apiKeyConfigured = Boolean(input.remote.connection.apiKey);
   const setupAssistantSummary = buildSetupAutomationSummary({
     remote: input.remote,
@@ -284,6 +293,8 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
       rowCount: reconciliationSummary.rowCount,
       unresolvedCount: reconciliationSummary.unresolvedCount,
       unresolvedReasons: reconciliationSummary.unresolvedReasons,
+      latestDigest: reconciliationDigests[0] ?? null,
+      digests: reconciliationDigests,
     },
     setupAssistant: {
       summary: setupAssistantSummary,
