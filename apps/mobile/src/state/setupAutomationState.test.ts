@@ -14,6 +14,7 @@ import {
   createSetupAutomationStore,
   getDefaultWindowsSetupEvidence,
   importMobilePairingPackage,
+  recordUnattendedSmokeTestPass,
 } from "./setupAutomationState.js";
 
 function buildDefaultInput() {
@@ -443,4 +444,44 @@ test("setup smoke test clears only with imported pairing, healthy engines, alert
   assert.equal(summary.readyCountLabel, "6/6 proof(s) clear");
   assert.equal(summary.blocking, false);
   assert.equal(summary.nextActionLabel, "Record unattended smoke test pass");
+});
+
+test("unattended smoke pass recorder fails closed when smoke proof is blocked", () => {
+  const evidence = {
+    ...getDefaultWindowsSetupEvidence(),
+    unattendedSmokeTestPassedAt: "previous",
+  };
+  const blocked = buildSetupSmokeTestSummary({
+    remote: getDefaultRemoteEngineSnapshot(),
+    pairing: getDefaultPairingDoctorSnapshot(),
+    phoneRuntime: getDefaultPhoneEngineRuntimeSnapshot(),
+    alertEvidence: getDefaultAlertEvidenceSnapshot(),
+    peerFailsafe: getDefaultPeerAlertFailsafeSnapshot(),
+    windows: evidence,
+  });
+
+  const result = recordUnattendedSmokeTestPass(blocked, evidence, "2026-06-28T10:05:00Z");
+
+  assert.equal(result.ok, false);
+  assert.equal(result.evidence.unattendedSmokeTestPassedAt, "previous");
+  assert.match(result.error, /Smoke test is blocked/);
+});
+
+test("setup automation store records unattended smoke pass only after clear proof", () => {
+  const store = createSetupAutomationStore(() => "2026-06-28T10:05:00Z");
+  const clearSummary = {
+    statusLabel: "Smoke test clear",
+    readyCountLabel: "6/6 proof(s) clear",
+    blockingCountLabel: "No smoke blockers",
+    nextActionLabel: "Record unattended smoke test pass",
+    blocking: false,
+    items: [],
+  };
+
+  const result = store.getState().recordUnattendedSmokeTestPass(clearSummary);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.evidence.unattendedSmokeTestPassedAt, "2026-06-28T10:05:00Z");
+  assert.equal(store.getState().snapshot.windows.unattendedSmokeTestPassedAt, "2026-06-28T10:05:00Z");
+  assert.equal(store.getState().snapshot.lastSmokeRecordError, "");
 });

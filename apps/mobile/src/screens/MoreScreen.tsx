@@ -52,6 +52,8 @@ export function MoreScreen() {
   const webViewSnapshot = useDiscordWebViewHealthState((state) => state.snapshot);
   const phoneRuntimeSnapshot = usePhoneEngineRuntimeState((state) => state.snapshot);
   const windowsSetup = useSetupAutomationState((state) => state.snapshot.windows);
+  const smokeRecordError = useSetupAutomationState((state) => state.snapshot.lastSmokeRecordError);
+  const recordSmokeTestPass = useSetupAutomationState((state) => state.recordUnattendedSmokeTestPass);
   const alertEvidenceSnapshot = useAlertEvidenceState((state) => state.snapshot);
   const peerFailsafeSnapshot = usePeerAlertFailsafeState((state) => state.snapshot);
   const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
@@ -188,6 +190,25 @@ export function MoreScreen() {
         </View>
         <Text style={styles.detail}>Next: {smokeTest.nextActionLabel}</Text>
         <Text style={styles.detail}>{smokeTest.blockingCountLabel}</Text>
+        {windowsSetup.unattendedSmokeTestPassedAt ? (
+          <Text style={styles.detail}>Recorded: {windowsSetup.unattendedSmokeTestPassedAt}</Text>
+        ) : null}
+        <View style={styles.actionRow}>
+          <Pressable
+            accessibilityRole="button"
+            {...buildActionButtonAccessibility("Record smoke test pass", {
+              disabled: smokeTest.blocking,
+            })}
+            disabled={smokeTest.blocking}
+            onPress={() => {
+              recordSmokeTestPass(smokeTest);
+            }}
+            style={[styles.button, smokeTest.blocking ? styles.buttonDisabled : null]}
+          >
+            <Text style={styles.buttonText}>Record pass</Text>
+          </Pressable>
+        </View>
+        {smokeRecordError ? <Text style={styles.error}>{smokeRecordError}</Text> : null}
         {smokeTest.items.map((item) => (
           <View key={item.key} style={styles.checklistRow}>
             <Text style={styles.label}>{item.label}</Text>
@@ -355,6 +376,7 @@ const styles = StyleSheet.create({
   checklistStatus: { fontSize: 14, fontWeight: "900", lineHeight: 19 },
   checklistStatusBlocking: { color: "#fca5a5" },
   checklistStatusClear: { color: "#86efac" },
+  actionRow: { alignItems: "flex-start", flexDirection: "row" },
   bundleText: {
     backgroundColor: "#020617",
     borderColor: "#1e293b",

@@ -114,6 +114,7 @@ export interface SetupAutomationSnapshot {
   windows: WindowsSetupEvidence;
   lastImportError: string;
   lastImportedAt: string;
+  lastSmokeRecordError: string;
 }
 
 export interface SetupAutomationState {
@@ -121,6 +122,7 @@ export interface SetupAutomationState {
   updateWindowsEvidence: (patch: Partial<WindowsSetupEvidence>) => void;
   replaceWindowsEvidence: (evidence: WindowsSetupEvidence) => void;
   importPairingPackage: (rawPackage: string) => MobilePairingPackageImportResult;
+  recordUnattendedSmokeTestPass: (summary: SetupSmokeTestSummary) => SetupSmokeTestRecordResult;
   clearSetupEvidence: () => void;
 }
 
@@ -132,11 +134,18 @@ export interface MobilePairingPackageImportResult {
   error: string;
 }
 
+export interface SetupSmokeTestRecordResult {
+  ok: boolean;
+  evidence: WindowsSetupEvidence;
+  error: string;
+}
+
 export function getDefaultSetupAutomationSnapshot(): SetupAutomationSnapshot {
   return {
     windows: getDefaultWindowsSetupEvidence(),
     lastImportError: "",
     lastImportedAt: "",
+    lastSmokeRecordError: "",
   };
 }
 
@@ -202,6 +211,17 @@ export function createSetupAutomationStore(now: () => string = () => new Date().
           windows: result.ok ? result.evidence : state.snapshot.windows,
           lastImportError: result.error,
           lastImportedAt: result.ok ? result.evidence.pairingPackageImportedAt : state.snapshot.lastImportedAt,
+        },
+      }));
+      return result;
+    },
+    recordUnattendedSmokeTestPass: (summary) => {
+      const result = recordUnattendedSmokeTestPass(summary, get().snapshot.windows, now());
+      set((state) => ({
+        snapshot: {
+          ...state.snapshot,
+          windows: result.ok ? result.evidence : state.snapshot.windows,
+          lastSmokeRecordError: result.error,
         },
       }));
       return result;
@@ -536,6 +556,30 @@ export function buildSetupSmokeTestSummary(input: SetupSmokeTestInput): SetupSmo
     nextActionLabel: firstBlocker?.actionLabel ?? "Record unattended smoke test pass",
     blocking: blockingCount > 0,
     items,
+  };
+}
+
+export function recordUnattendedSmokeTestPass(
+  summary: SetupSmokeTestSummary,
+  currentEvidence: WindowsSetupEvidence,
+  recordedAt: string,
+): SetupSmokeTestRecordResult {
+  if (summary.blocking) {
+    const firstBlocker = summary.items.find((item) => item.blocking);
+    return {
+      ok: false,
+      evidence: currentEvidence,
+      error: `Smoke test is blocked${firstBlocker ? `: ${firstBlocker.label}` : ""}.`,
+    };
+  }
+
+  return {
+    ok: true,
+    evidence: {
+      ...currentEvidence,
+      unattendedSmokeTestPassedAt: recordedAt,
+    },
+    error: "",
   };
 }
 
