@@ -19,6 +19,15 @@ function New-MobileApiKey {
     return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
+function New-PairingDeepLink {
+    param([object]$Payload)
+
+    $json = $Payload | ConvertTo-Json -Depth 8 -Compress
+    $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+    $encoded = [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+    return "apkalerts://pair?payload=$encoded"
+}
+
 function Resolve-TailscaleExe {
     $command = Get-Command tailscale.exe -ErrorAction SilentlyContinue
     if ($command) {
@@ -201,6 +210,7 @@ function Write-PairingPackage {
     )
 
     $pairingPath = Join-Path $Root "mobile-pairing.json"
+    $deepLinkPath = Join-Path $Root "mobile-pairing-link.txt"
     $payload = [ordered]@{
         version = 1
         app = "mobile-consolidation"
@@ -210,7 +220,11 @@ function Write-PairingPackage {
         transportHint = "tailscale"
     }
     $payload | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $pairingPath -Encoding UTF8
-    return $pairingPath
+    New-PairingDeepLink -Payload $payload | Set-Content -LiteralPath $deepLinkPath -Encoding UTF8
+    return [pscustomobject]@{
+        jsonPath = $pairingPath
+        deepLinkPath = $deepLinkPath
+    }
 }
 
 function Write-SetupEvidence {
@@ -257,7 +271,7 @@ $envPath = Write-RemoteEnvironment -RepoRoot $repoRoot -Port $ApiPort -ApiKey $M
 $remoteHost = if ($tailscaleStatus.ip) { $tailscaleStatus.ip } else { "127.0.0.1" }
 $remoteApiUrl = "http://$remoteHost`:$ApiPort/api"
 $apiPreflight = Test-MobileApiPreflight -Port $ApiPort -RemoteApiUrl $remoteApiUrl -FirewallOpen $firewallOpen
-$pairingPath = Write-PairingPackage -Root $InstallRoot -RemoteApiUrl $remoteApiUrl -ApiKey $MobileApiKey
+$pairingPackage = Write-PairingPackage -Root $InstallRoot -RemoteApiUrl $remoteApiUrl -ApiKey $MobileApiKey
 
 if (-not $EvidencePath) {
     $EvidencePath = Join-Path $InstallRoot "mobile-setup-evidence.json"
@@ -269,9 +283,10 @@ $setupEvidencePath = Write-SetupEvidence `
     -TailscaleStatus $tailscaleStatus `
     -FirewallOpen $firewallOpen `
     -ApiPreflight $apiPreflight `
-    -PairingPackagePath $pairingPath
+    -PairingPackagePath $pairingPackage.jsonPath
 
 Write-Host "Consolidation repo: $repoRoot"
 Write-Host "Mobile env file: $envPath"
-Write-Host "Pairing package: $pairingPath"
+Write-Host "Pairing package JSON: $($pairingPackage.jsonPath)"
+Write-Host "Pairing deep link file: $($pairingPackage.deepLinkPath)"
 Write-Host "Setup evidence: $setupEvidencePath"

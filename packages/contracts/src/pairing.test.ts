@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildRemotePairingDeepLink,
   normalizeRemotePairingConfigPayload,
   normalizeRemotePairingStatusPayload,
+  parseRemotePairingPackageInput,
 } from "./index.js";
 
 test("remote pairing status normalization maps snake case without carrying secrets", () => {
@@ -55,6 +57,41 @@ test("remote pairing config normalization keeps the explicit import key", () => 
   assert.equal(config.remoteApiUrl, "http://100.90.10.11:8003/api");
   assert.equal(config.apiKey, "mobile-secret-value");
   assert.equal(config.transportHint, "tailscale");
+});
+
+test("remote pairing package input parses JSON and apkalerts deep links", () => {
+  const config = {
+    version: 1,
+    app: "mobile-consolidation",
+    createdAt: "2026-06-28T12:10:00Z",
+    remoteApiUrl: "http://100.90.10.11:8003/api",
+    apiKey: "mobile-secret-value",
+    transportHint: "tailscale" as const,
+    requiredEndpoints: [],
+  };
+
+  const fromJson = parseRemotePairingPackageInput(JSON.stringify(config));
+  const deepLink = buildRemotePairingDeepLink(config);
+  const fromDeepLink = parseRemotePairingPackageInput(` ${deepLink} `);
+
+  assert.equal(fromJson.ok, true);
+  assert.equal(fromJson.format, "json");
+  assert.equal(fromJson.config.remoteApiUrl, "http://100.90.10.11:8003/api");
+  assert.equal(fromDeepLink.ok, true);
+  assert.equal(fromDeepLink.format, "deep_link");
+  assert.equal(fromDeepLink.config.apiKey, "mobile-secret-value");
+  assert.match(deepLink, /^apkalerts:\/\/pair\?payload=/);
+  assert.doesNotMatch(deepLink, /mobile-secret-value|\{|"apiKey"/);
+});
+
+test("remote pairing package input fails closed for malformed deep links without echoing payloads", () => {
+  const result = parseRemotePairingPackageInput("apkalerts://pair?payload=not-json");
+
+  assert.equal(result.ok, false);
+  assert.equal(result.format, "deep_link");
+  assert.equal(result.config.version, 0);
+  assert.match(result.error, /valid pairing payload/);
+  assert.doesNotMatch(result.error, /not-json/);
 });
 
 test("remote pairing status normalization fails closed on malformed payloads", () => {

@@ -40,6 +40,19 @@ export interface RemotePairingConfig {
   requiredEndpoints: RemotePairingEndpoint[];
 }
 
+export type RemotePairingPackageInputFormat = "json" | "deep_link" | "unknown";
+
+export interface RemotePairingPackageInputResult {
+  ok: boolean;
+  format: RemotePairingPackageInputFormat;
+  config: RemotePairingConfig;
+  error: string;
+}
+
+const PAIRING_DEEP_LINK_SCHEME = "apkalerts:";
+const PAIRING_DEEP_LINK_HOST = "pair";
+const BASE64_URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -160,4 +173,172 @@ export function normalizeRemotePairingConfigPayload(payload: unknown): RemotePai
     transportHint: normalizeTransportHint(input.transport_hint ?? input.transportHint),
     requiredEndpoints: normalizeEndpoints(input.required_endpoints ?? input.requiredEndpoints),
   };
+}
+
+export function buildRemotePairingDeepLink(config: RemotePairingConfig): string {
+  const payload = {
+    version: config.version,
+    app: config.app,
+    createdAt: config.createdAt,
+    remoteApiUrl: config.remoteApiUrl,
+    apiKey: config.apiKey,
+    transportHint: config.transportHint,
+    requiredEndpoints: config.requiredEndpoints,
+  };
+  return `apkalerts://pair?payload=${encodeBase64Url(JSON.stringify(payload))}`;
+}
+
+export function parseRemotePairingPackageInput(rawInput: string): RemotePairingPackageInputResult {
+  const input = cleanString(rawInput);
+  const jsonRecord = parseJsonRecord(input);
+  if (jsonRecord) {
+    return parsedPairingPackageInput("json", jsonRecord);
+  }
+
+  const deepLink = parsePairingDeepLink(input);
+  if (deepLink.ok) {
+    return parsedPairingPackageInput("deep_link", deepLink.payload);
+  }
+  if (deepLink.matched) {
+    return failedPairingPackageInput("deep_link", deepLink.error);
+  }
+
+  return failedPairingPackageInput(
+    "unknown",
+    "Pairing package must be valid JSON or an apkalerts://pair deep link.",
+  );
+}
+
+function parsedPairingPackageInput(
+  format: RemotePairingPackageInputFormat,
+  payload: Record<string, unknown>,
+): RemotePairingPackageInputResult {
+  return {
+    ok: true,
+    format,
+    config: normalizeRemotePairingConfigPayload(payload),
+    error: "",
+  };
+}
+
+function failedPairingPackageInput(
+  format: RemotePairingPackageInputFormat,
+  error: string,
+): RemotePairingPackageInputResult {
+  return {
+    ok: false,
+    format,
+    config: normalizeRemotePairingConfigPayload(null),
+    error,
+  };
+}
+
+function parsePairingDeepLink(input: string):
+  | { ok: true; matched: true; payload: Record<string, unknown> }
+  | { ok: false; matched: boolean; error: string } {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    return { ok: false, matched: false, error: "" };
+  }
+
+  const route = url.hostname || url.pathname.replace(/^\/+/, "");
+  const matched = url.protocol === PAIRING_DEEP_LINK_SCHEME && route === PAIRING_DEEP_LINK_HOST;
+  if (!matched) {
+    return { ok: false, matched: false, error: "" };
+  }
+
+  const payload = cleanString(url.searchParams.get("payload") ?? url.searchParams.get("p"));
+  if (!payload) {
+    return { ok: false, matched: true, error: "Pairing deep link is missing a payload." };
+  }
+
+  const json = decodeBase64UrlToString(payload);
+  const parsed = json ? parseJsonRecord(json) : null;
+  if (!parsed) {
+    return {
+      ok: false,
+      matched: true,
+      error: "Pairing deep link must contain a valid pairing payload.",
+    };
+  }
+
+  return { ok: true, matched: true, payload: parsed };
+}
+
+function parseJsonRecord(input: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(input);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function encodeBase64Url(input: string): string {
+  const bytes = stringToUtf8Bytes(input);
+  let output = "";
+
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index] ?? 0;
+    const second = bytes[index + 1];
+    const third = bytes[index + 2];
+    const combined = (first << 16) | ((second ?? 0) << 8) | (third ?? 0);
+
+    output += BASE64_URL_ALPHABET[(combined >> 18) & 63];
+    output += BASE64_URL_ALPHABET[(combined >> 12) & 63];
+    if (second !== undefined) {
+      output += BASE64_URL_ALPHABET[(combined >> 6) & 63];
+    }
+    if (third !== undefined) {
+      output += BASE64_URL_ALPHABET[combined & 63];
+    }
+  }
+
+  return output;
+}
+
+function decodeBase64UrlToString(input: string): string | null {
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+
+  for (const char of input) {
+    const value = BASE64_URL_ALPHABET.indexOf(char);
+    if (value < 0) {
+      return null;
+    }
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 255);
+    }
+  }
+
+  return utf8BytesToString(bytes);
+}
+
+function stringToUtf8Bytes(input: string): number[] {
+  const encoded = encodeURIComponent(input);
+  const bytes: number[] = [];
+  for (let index = 0; index < encoded.length; index += 1) {
+    const char = encoded[index];
+    if (char === "%") {
+      bytes.push(Number.parseInt(encoded.slice(index + 1, index + 3), 16));
+      index += 2;
+    } else if (char) {
+      bytes.push(char.charCodeAt(0));
+    }
+  }
+  return bytes;
+}
+
+function utf8BytesToString(bytes: number[]): string | null {
+  try {
+    return decodeURIComponent(bytes.map((byte) => `%${byte.toString(16).padStart(2, "0")}`).join(""));
+  } catch {
+    return null;
+  }
 }

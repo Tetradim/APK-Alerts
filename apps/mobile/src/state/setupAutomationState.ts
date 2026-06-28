@@ -1,6 +1,7 @@
 import {
-  normalizeRemotePairingConfigPayload,
+  parseRemotePairingPackageInput,
   type RemotePairingConfig,
+  type RemotePairingPackageInputFormat,
 } from "@apk-alerts/contracts";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
@@ -128,6 +129,7 @@ export interface SetupAutomationState {
 
 export interface MobilePairingPackageImportResult {
   ok: boolean;
+  inputFormat: RemotePairingPackageInputFormat;
   connection: RemoteConnectionDraft | null;
   config: RemotePairingConfig | null;
   evidence: WindowsSetupEvidence;
@@ -246,29 +248,38 @@ export function importMobilePairingPackage(
   currentEvidence: WindowsSetupEvidence,
   importedAt: string,
 ): MobilePairingPackageImportResult {
-  const parsed = parseJsonRecord(rawPackage);
-  if (!parsed) {
-    return failPairingImport(currentEvidence, "Pairing package must be valid JSON.");
+  const parsed = parseRemotePairingPackageInput(rawPackage);
+  if (!parsed.ok) {
+    return failPairingImport(currentEvidence, parsed.error, parsed.format);
   }
 
-  const config = normalizeRemotePairingConfigPayload(parsed);
+  const config = parsed.config;
   const remoteApiUrl = config.remoteApiUrl.trim();
   const apiKey = config.apiKey.trim();
 
   if (config.version <= 0 || config.app !== "mobile-consolidation") {
-    return failPairingImport(currentEvidence, "Pairing package is not for Mobile Consolidation.");
+    return failPairingImport(
+      currentEvidence,
+      "Pairing package is not for Mobile Consolidation.",
+      parsed.format,
+    );
   }
 
   if (!isHttpUrl(remoteApiUrl)) {
-    return failPairingImport(currentEvidence, "Pairing package must include a valid remote API URL.");
+    return failPairingImport(
+      currentEvidence,
+      "Pairing package must include a valid remote API URL.",
+      parsed.format,
+    );
   }
 
   if (!apiKey) {
-    return failPairingImport(currentEvidence, "Pairing package must include an API key.");
+    return failPairingImport(currentEvidence, "Pairing package must include an API key.", parsed.format);
   }
 
   return {
     ok: true,
+    inputFormat: parsed.format,
     connection: {
       baseApiUrl: remoteApiUrl,
       apiKey,
@@ -583,23 +594,14 @@ export function recordUnattendedSmokeTestPass(
   };
 }
 
-function parseJsonRecord(rawPackage: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(rawPackage);
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function failPairingImport(
   currentEvidence: WindowsSetupEvidence,
   error: string,
+  inputFormat: RemotePairingPackageInputFormat = "unknown",
 ): MobilePairingPackageImportResult {
   return {
     ok: false,
+    inputFormat,
     connection: null,
     config: null,
     evidence: currentEvidence,
