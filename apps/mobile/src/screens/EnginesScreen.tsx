@@ -13,6 +13,10 @@ import {
   buildPhoneEngineRuntimeSummary,
   usePhoneEngineRuntimeState,
 } from "@/state/phoneEngineRuntimeState";
+import {
+  buildPairingDoctorSummary,
+  usePairingDoctorState,
+} from "@/state/pairingDoctorState";
 import { buildRemoteEngineSummary, useRemoteEngineState } from "@/state/remoteEngineState";
 
 function healthTone(label: string): "good" | "warn" | "bad" | "neutral" {
@@ -35,6 +39,13 @@ function phoneRuntimeTone(blocking: boolean): "good" | "bad" {
   return blocking ? "bad" : "good";
 }
 
+function pairingTone(blocking: boolean, checking: boolean): "good" | "warn" | "bad" | "neutral" {
+  if (checking) {
+    return "warn";
+  }
+  return blocking ? "bad" : "good";
+}
+
 function adapterLabel(embedded: boolean, ready: boolean): string {
   if (!embedded) {
     return "not embedded";
@@ -49,8 +60,11 @@ export function EnginesScreen() {
   const checkRemote = useRemoteEngineState((state) => state.checkRemote);
   const phoneRuntimeSnapshot = usePhoneEngineRuntimeState((state) => state.snapshot);
   const updatePhoneRuntime = usePhoneEngineRuntimeState((state) => state.updateRuntime);
+  const pairingSnapshot = usePairingDoctorState((state) => state.snapshot);
+  const runPairingDoctor = usePairingDoctorState((state) => state.runDoctor);
   const summary = buildRemoteEngineSummary(snapshot);
   const phoneRuntime = buildPhoneEngineRuntimeSummary(phoneRuntimeSnapshot);
+  const pairingSummary = buildPairingDoctorSummary(pairingSnapshot);
   const phoneBusy = phoneAction !== "idle";
 
   const runPhoneRuntimeAction = async (action: "refresh" | "start" | "stop") => {
@@ -129,6 +143,56 @@ export function EnginesScreen() {
           detail={phoneRuntime.detailLabel}
         />
         <MetricTile label="Remote" value={summary.remoteHealthLabel} detail={summary.remoteDetailLabel} />
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.panelCopy}>
+            <Text style={styles.label}>Pairing Doctor</Text>
+            <Text style={styles.panelTitle}>{pairingSummary.detailLabel}</Text>
+          </View>
+          <StatusPill
+            label={pairingSummary.statusLabel}
+            tone={pairingTone(pairingSummary.blocking, pairingSnapshot.checking)}
+          />
+        </View>
+        {pairingSummary.errorLabel ? <Text style={styles.error}>{pairingSummary.errorLabel}</Text> : null}
+        {pairingSnapshot.status?.blockingIssues.slice(0, 4).map((issue) => (
+          <Text key={issue.code} style={styles.error}>
+            {issue.code}: {issue.message}
+          </Text>
+        ))}
+        {pairingSnapshot.checks.slice(0, 8).map((check) => (
+          <View key={`${check.key}-${check.path}`} style={styles.checkRow}>
+            <Text style={styles.fieldLabel}>{check.label}</Text>
+            <Text style={[styles.checkStatus, check.ok ? styles.checkStatusPass : styles.checkStatusFail]}>
+              {check.ok ? "Pass" : check.skipped ? "Skipped" : "Fail"}
+            </Text>
+            <Text style={styles.detail}>
+              {check.method} {check.path}{check.error ? ` - ${check.error}` : ""}
+            </Text>
+          </View>
+        ))}
+        <Pressable
+          accessibilityRole="button"
+          {...buildActionButtonAccessibility("Run Pairing Doctor", {
+            busy: pairingSnapshot.checking,
+            disabled: pairingSnapshot.checking || !snapshot.connection.baseApiUrl,
+          })}
+          disabled={pairingSnapshot.checking || !snapshot.connection.baseApiUrl}
+          onPress={() =>
+            void runPairingDoctor({
+              baseApiUrl: snapshot.connection.baseApiUrl,
+              apiKey: snapshot.connection.apiKey,
+            })
+          }
+          style={[
+            styles.button,
+            pairingSnapshot.checking || !snapshot.connection.baseApiUrl ? styles.buttonDisabled : null,
+          ]}
+        >
+          <Text style={styles.buttonText}>{pairingSnapshot.checking ? "Checking" : "Run Doctor"}</Text>
+        </Pressable>
       </View>
 
       <View style={styles.panel}>
@@ -238,6 +302,15 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.55 },
   buttonText: { color: "#ffffff", fontSize: 14, fontWeight: "900", textAlign: "center" },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  checkRow: {
+    borderTopColor: "#1e293b",
+    borderTopWidth: 1,
+    gap: 4,
+    paddingTop: 10,
+  },
+  checkStatus: { fontSize: 13, fontWeight: "900" },
+  checkStatusFail: { color: "#fca5a5" },
+  checkStatusPass: { color: "#86efac" },
   tileRow: { flexDirection: "row", gap: 10 },
   value: { color: "#f8fafc", fontSize: 16, fontWeight: "900", marginTop: 4 },
   detail: { color: "#94a3b8", fontSize: 13 },

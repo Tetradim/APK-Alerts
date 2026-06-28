@@ -11,6 +11,7 @@ import {
 } from "@apk-alerts/contracts";
 import {
   buildAlertReconciliationTraceSummary,
+  buildAlertEvidenceTimeline,
   buildAlertTestEvidenceSummary,
   buildBridgeSupervisorSummary,
   buildQueuePlaceEvidenceSummary,
@@ -126,6 +127,33 @@ test("accepted alert evidence summarizes audit-only execution state", () => {
   assert.equal(summary.latestAlertLabel, "Accepted - chrome-message-1");
   assert.equal(summary.latestDecisionLabel, "auto trading disabled");
   assert.equal(summary.liveReadinessLabel, "Audit only - live readiness not proven");
+});
+
+test("alert evidence timeline orders see parse decide queue and reconcile stages", () => {
+  const chain = evidenceSnapshot().chains[0];
+  const reconciliation = normalizeReconciliationPayload({
+    rows: [
+      {
+        alert_id: "alert-1",
+        trade_requested: false,
+        processed: true,
+        simulated: true,
+      },
+    ],
+  });
+
+  const timeline = buildAlertEvidenceTimeline(chain, reconciliation);
+
+  assert.deepEqual(
+    timeline.map((item) => item.key),
+    ["see", "parse", "decide", "queue", "reconcile"],
+  );
+  assert.equal(timeline[0]?.statusLabel, "Seen");
+  assert.equal(timeline[1]?.statusLabel, "Parsed high");
+  assert.equal(timeline[2]?.statusLabel, "Accepted");
+  assert.equal(timeline[3]?.statusLabel, "No order queued");
+  assert.equal(timeline[4]?.statusLabel, "Reconciled");
+  assert.equal(timeline.some((item) => item.blocking), false);
 });
 
 test("skipped alert evidence surfaces parser and source skip reason", () => {

@@ -5,6 +5,7 @@ import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
 import {
   buildAlertEvidenceSummary,
+  buildAlertEvidenceTimeline,
   buildAlertReconciliationTraceSummary,
   buildAlertTestEvidenceSummary,
   buildBridgeSupervisorSummary,
@@ -155,6 +156,7 @@ export function AlertsScreen() {
             chain,
             reconciliationSnapshot.remote.rows,
           );
+          const timeline = buildAlertEvidenceTimeline(chain, reconciliationSnapshot.remote.rows);
           return (
             <View key={chain.eventId} style={styles.panel}>
               <View style={styles.panelHeader}>
@@ -167,6 +169,18 @@ export function AlertsScreen() {
               <Text style={styles.detail}>Author: {chain.authorName || "unknown"}</Text>
               <Text style={styles.detail}>Parser confidence: {chain.parserConfidence}</Text>
               <Text style={styles.detail}>Decision: {chain.latestReason || "No decision reason"}</Text>
+              <View style={styles.evidenceHeader}>
+                <Text style={styles.label}>Evidence timeline</Text>
+              </View>
+              {timeline.map((item) => (
+                <View key={item.key} style={styles.timelineRow}>
+                  <Text style={styles.timelineLabel}>{item.label}</Text>
+                  <Text style={[styles.timelineStatus, item.blocking ? styles.timelineBlocked : styles.timelineClear]}>
+                    {item.statusLabel}
+                  </Text>
+                  <Text style={styles.detail}>{item.detailLabel}</Text>
+                </View>
+              ))}
               <View style={styles.evidenceHeader}>
                 <Text style={styles.label}>Alert test evidence</Text>
                 <StatusPill label={alertTest.gateLabel} tone={alertTestTone(alertTest.blocking)} />
@@ -236,6 +250,11 @@ const styles = StyleSheet.create({
   value: { color: "#f8fafc", fontSize: 16, fontWeight: "900", marginTop: 4 },
   detail: { color: "#cbd5e1", fontSize: 13, lineHeight: 19 },
   auditText: { color: "#94a3b8", fontSize: 12, lineHeight: 18 },
+  timelineRow: { borderTopColor: "#1e293b", borderTopWidth: 1, gap: 3, paddingTop: 8 },
+  timelineLabel: { color: "#94a3b8", fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
+  timelineStatus: { fontSize: 13, fontWeight: "900" },
+  timelineBlocked: { color: "#fca5a5" },
+  timelineClear: { color: "#86efac" },
   error: { color: "#fca5a5", fontSize: 13, fontWeight: "800" },
   button: {
     alignItems: "center",

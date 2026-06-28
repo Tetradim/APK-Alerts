@@ -27,3 +27,11 @@ export {
   type PeerAlertFailsafeClientConfig,
   type PeerAlertFailsafeResult,
 } from "./peerAlertFailsafeClient";
+export {
+  fetchRemotePairingStatus,
+  runRemotePairingDoctor,
+  type RemotePairingClientConfig,
+  type RemotePairingDoctorResult,
+  type RemotePairingEndpointProbeResult,
+  type RemotePairingStatusResult,
+} from "./remotePairingClient";

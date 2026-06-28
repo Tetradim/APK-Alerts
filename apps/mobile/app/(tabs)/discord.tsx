@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
-import { buildDiscordWebViewUiState } from "@/state/discordWebViewState";
+import {
+  buildDiscordWebViewUiState,
+  useDiscordWebViewHealthState,
+} from "@/state/discordWebViewState";
 import { useSettingsState } from "@/state/settingsState";
 
 const DISCORD_WEB_URL = "https://discord.com/channels/@me";
@@ -17,6 +20,11 @@ export default function DiscordTab() {
   const [reloadKey, setReloadKey] = useState(0);
   const webRef = useRef<WebView>(null);
   const settings = useSettingsState((state) => state.snapshot.discordIngestionSettings);
+  const recordLoadStart = useDiscordWebViewHealthState((state) => state.recordLoadStart);
+  const recordLoadEnd = useDiscordWebViewHealthState((state) => state.recordLoadEnd);
+  const recordError = useDiscordWebViewHealthState((state) => state.recordError);
+  const recordTimeout = useDiscordWebViewHealthState((state) => state.recordTimeout);
+  const recordReload = useDiscordWebViewHealthState((state) => state.recordReload);
   const uiState = buildDiscordWebViewUiState(settings, {
     loading,
     error: loadError,
@@ -27,6 +35,7 @@ export default function DiscordTab() {
     setLoadError("");
     setLoadTimedOut(false);
     setLoading(true);
+    recordReload();
     setReloadKey((current) => current + 1);
     webRef.current?.reload();
   };
@@ -39,6 +48,7 @@ export default function DiscordTab() {
     const timeoutId = setTimeout(() => {
       setLoadTimedOut(true);
       setLoading(false);
+      recordTimeout();
     }, 20_000);
 
     return () => clearTimeout(timeoutId);
@@ -88,20 +98,26 @@ export default function DiscordTab() {
           setLoading(true);
           setLoadError("");
           setLoadTimedOut(false);
+          recordLoadStart();
         }}
         onLoadEnd={() => {
           setLoading(false);
           setLoadTimedOut(false);
+          recordLoadEnd();
         }}
         onError={(event) => {
           setLoading(false);
           setLoadTimedOut(false);
-          setLoadError(event.nativeEvent.description || "Discord WebView failed to load.");
+          const error = event.nativeEvent.description || "Discord WebView failed to load.";
+          setLoadError(error);
+          recordError(error);
         }}
         onHttpError={(event) => {
           setLoading(false);
           setLoadTimedOut(false);
-          setLoadError(`Discord returned HTTP ${event.nativeEvent.statusCode}.`);
+          const error = `Discord returned HTTP ${event.nativeEvent.statusCode}.`;
+          setLoadError(error);
+          recordError(error);
         }}
         javaScriptEnabled
         domStorageEnabled

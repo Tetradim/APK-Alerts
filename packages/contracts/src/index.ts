@@ -6,3 +6,4 @@ export * from "./bridgeEvidence";
 export * from "./liveReadiness";
 export * from "./reconciliation";
 export * from "./peerAlertFailsafe";
+export * from "./pairing";

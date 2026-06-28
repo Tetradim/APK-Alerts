@@ -1,14 +1,28 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
+import { useAlertEvidenceState } from "@/state/alertEvidenceState";
+import { useDiscordWebViewHealthState } from "@/state/discordWebViewState";
+import {
+  buildMobileInstallReadinessSummary,
+} from "@/state/installReadinessState";
 import {
   buildLiveArmChecklistSummary,
   buildLiveReadinessSummary,
   buildReplayAcceptanceEvidenceSummary,
   useLiveReadinessState,
 } from "@/state/liveReadinessState";
+import { usePairingDoctorState } from "@/state/pairingDoctorState";
+import { usePhoneEngineRuntimeState } from "@/state/phoneEngineRuntimeState";
+import { useReconciliationState } from "@/state/reconciliationState";
+import { useRemoteEngineState } from "@/state/remoteEngineState";
+import {
+  buildMobileSupportBundle,
+  serializeMobileSupportBundle,
+} from "@/state/supportBundleState";
 
 function readinessTone(label: string): "good" | "warn" | "bad" | "neutral" {
   if (label === "Ready") {
@@ -27,9 +41,45 @@ function checklistTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
 export function MoreScreen() {
   const snapshot = useLiveReadinessState((state) => state.snapshot);
   const checkReadiness = useLiveReadinessState((state) => state.checkReadiness);
+  const remoteSnapshot = useRemoteEngineState((state) => state.snapshot);
+  const pairingSnapshot = usePairingDoctorState((state) => state.snapshot);
+  const webViewSnapshot = useDiscordWebViewHealthState((state) => state.snapshot);
+  const phoneRuntimeSnapshot = usePhoneEngineRuntimeState((state) => state.snapshot);
+  const alertEvidenceSnapshot = useAlertEvidenceState((state) => state.snapshot);
+  const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
   const summary = buildLiveReadinessSummary(snapshot);
   const liveChecklist = buildLiveArmChecklistSummary(snapshot);
   const replayEvidence = buildReplayAcceptanceEvidenceSummary(snapshot);
+  const installReadiness = buildMobileInstallReadinessSummary({
+    pairing: pairingSnapshot,
+    webView: webViewSnapshot,
+    phoneRuntime: phoneRuntimeSnapshot,
+    liveReadiness: snapshot,
+  });
+  const supportBundleText = useMemo(
+    () =>
+      serializeMobileSupportBundle(
+        buildMobileSupportBundle({
+          createdAt: new Date().toISOString(),
+          remote: remoteSnapshot,
+          pairing: pairingSnapshot,
+          phoneRuntime: phoneRuntimeSnapshot,
+          webView: webViewSnapshot,
+          liveReadiness: snapshot,
+          alertEvidence: alertEvidenceSnapshot,
+          reconciliation: reconciliationSnapshot,
+        }),
+      ),
+    [
+      alertEvidenceSnapshot,
+      pairingSnapshot,
+      phoneRuntimeSnapshot,
+      reconciliationSnapshot,
+      remoteSnapshot,
+      snapshot,
+      webViewSnapshot,
+    ],
+  );
   const readiness = snapshot.remote.readiness;
 
   return (
@@ -68,6 +118,34 @@ export function MoreScreen() {
       <View style={styles.tileRow}>
         <MetricTile label="Broker" value={summary.brokerLabel} detail={summary.reconciliationLabel} />
         <MetricTile label="Ingestion" value={summary.ingestionLabel} detail={summary.replayLabel} />
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Mobile install readiness</Text>
+            <Text style={styles.panelTitle}>{installReadiness.readyCountLabel}</Text>
+          </View>
+          <StatusPill
+            label={installReadiness.statusLabel}
+            tone={checklistTone(installReadiness.blocking)}
+          />
+        </View>
+        <Text style={styles.detail}>{installReadiness.blockingCountLabel}</Text>
+        {installReadiness.items.map((item) => (
+          <View key={item.key} style={styles.checklistRow}>
+            <Text style={styles.label}>{item.label}</Text>
+            <Text
+              style={[
+                styles.checklistStatus,
+                item.blocking ? styles.checklistStatusBlocking : styles.checklistStatusClear,
+              ]}
+            >
+              {item.statusLabel}
+            </Text>
+            <Text style={styles.detail}>{item.detailLabel}</Text>
+          </View>
+        ))}
       </View>
 
       <View style={styles.tileRow}>
@@ -130,6 +208,16 @@ export function MoreScreen() {
           ))
         )}
       </View>
+
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>Support bundle</Text>
+        <Text style={styles.detail}>
+          Non-secret JSON for troubleshooting pairing, WebView, engine, alert, and reconciliation evidence.
+        </Text>
+        <Text selectable style={styles.bundleText}>
+          {supportBundleText}
+        </Text>
+      </View>
     </ScreenFrame>
   );
 }
@@ -154,6 +242,18 @@ const styles = StyleSheet.create({
   checklistStatus: { fontSize: 14, fontWeight: "900", lineHeight: 19 },
   checklistStatusBlocking: { color: "#fca5a5" },
   checklistStatusClear: { color: "#86efac" },
+  bundleText: {
+    backgroundColor: "#020617",
+    borderColor: "#1e293b",
+    borderRadius: 8,
+    borderWidth: 1,
+    color: "#cbd5e1",
+    fontFamily: "monospace",
+    fontSize: 11,
+    lineHeight: 16,
+    maxHeight: 260,
+    padding: 10,
+  },
   error: { color: "#fca5a5", fontSize: 13, fontWeight: "800" },
   button: {
     alignItems: "center",

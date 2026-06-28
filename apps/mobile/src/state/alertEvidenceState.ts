@@ -102,6 +102,14 @@ export interface AlertReconciliationTraceSummary {
   blocking: boolean;
 }
 
+export interface AlertEvidenceTimelineItem {
+  key: "see" | "parse" | "decide" | "queue" | "reconcile";
+  label: string;
+  statusLabel: string;
+  detailLabel: string;
+  blocking: boolean;
+}
+
 export interface AlertEvidenceState {
   snapshot: AlertEvidenceSnapshot;
   activeRequestId: number;
@@ -404,6 +412,69 @@ export function buildAlertReconciliationTraceSummary(
   };
 }
 
+export function buildAlertEvidenceTimeline(
+  chain: AlertEvidenceChain | null | undefined,
+  rows: ReconciliationRow[],
+): AlertEvidenceTimelineItem[] {
+  if (!chain) {
+    return [
+      timelineItem("see", "See", "Missing", "No alert chain evidence", true),
+      timelineItem("parse", "Parse", "Missing", "No parser evidence", true),
+      timelineItem("decide", "Decide", "Missing", "No audit decision", true),
+      timelineItem("queue", "Queue/place", "Missing", "No queue evidence", true),
+      timelineItem("reconcile", "Reconcile", "Missing", "No reconciliation evidence", true),
+    ];
+  }
+
+  const ingestion = chain.decision?.decision ?? chain.signal?.ingestion ?? null;
+  const parsed = chain.parserConfidence !== "none";
+  const queue = buildQueuePlaceEvidenceSummary(chain);
+  const reconciliation = buildAlertReconciliationTraceSummary(chain, rows);
+  const noOrderExpected = Boolean(ingestion && !ingestion.tradeRequested);
+
+  return [
+    timelineItem(
+      "see",
+      "See",
+      chain.signal || chain.decision ? "Seen" : "Missing",
+      chain.signal?.busEventId || chain.decision?.auditEventId || chain.eventId,
+      !(chain.signal || chain.decision),
+    ),
+    timelineItem(
+      "parse",
+      "Parse",
+      parsed ? `Parsed ${chain.parserConfidence}` : "Parse missing",
+      parsed ? chain.rawText || chain.eventId : "Parser output missing",
+      !parsed,
+    ),
+    timelineItem(
+      "decide",
+      "Decide",
+      chain.decision ? formatStatusLabel(chain.decision.decision.status) : "Decision missing",
+      chain.latestReason || "No audit decision reason",
+      !chain.decision,
+    ),
+    timelineItem(
+      "queue",
+      "Queue/place",
+      queue.blocking
+        ? noOrderExpected
+          ? "No order queued"
+          : "Queue blocked"
+        : "Order queued",
+      queue.reasonLabel,
+      noOrderExpected ? false : queue.blocking,
+    ),
+    timelineItem(
+      "reconcile",
+      "Reconcile",
+      reconciliation.blocking ? "Reconcile blocked" : "Reconciled",
+      reconciliation.reconciliationLabel,
+      reconciliation.blocking,
+    ),
+  ];
+}
+
 export function buildQueuePlaceEvidenceSummary(chain: AlertEvidenceChain | null | undefined): QueuePlaceEvidenceSummary {
   const ingestion = chain?.decision?.decision ?? chain?.signal?.ingestion ?? null;
   if (!ingestion) {
@@ -438,6 +509,16 @@ export function buildQueuePlaceEvidenceSummary(chain: AlertEvidenceChain | null 
     auditLabel: chain?.decision?.auditEventId ? `Audited decision: ${chain.decision.auditEventId}` : "No audited decision",
     blocking: !queued,
   };
+}
+
+function timelineItem(
+  key: AlertEvidenceTimelineItem["key"],
+  label: string,
+  statusLabel: string,
+  detailLabel: string,
+  blocking: boolean,
+): AlertEvidenceTimelineItem {
+  return { key, label, statusLabel, detailLabel, blocking };
 }
 
 export function buildSourcePolicySummary(chain: AlertEvidenceChain | null | undefined): SourcePolicyDisplaySummary {
