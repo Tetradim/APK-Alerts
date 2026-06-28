@@ -1,4 +1,9 @@
 import {
+  DEFAULT_DISCORD_INGESTION_SETTINGS,
+  type DiscordIngestionAuditDigest,
+  type DiscordIngestionSettings,
+} from "@apk-alerts/contracts";
+import {
   buildAlertAuditDigest,
   buildAlertTestEvidenceSummary,
   type AlertAuditDigest,
@@ -27,6 +32,7 @@ import {
   type ReconciliationSnapshot,
 } from "./reconciliationState";
 import type { RemoteEngineSnapshot } from "./remoteEngineState";
+import { buildMobileDiscordIngestionRouteDigest } from "./settingsState";
 import {
   buildSetupAutomationSummary,
   buildWindowsApiPreflightSummary,
@@ -43,6 +49,7 @@ export interface MobileSupportBundleInput {
   alertEvidence: AlertEvidenceSnapshot;
   reconciliation: ReconciliationSnapshot;
   windowsSetup: WindowsSetupEvidence;
+  discordIngestionSettings?: DiscordIngestionSettings;
 }
 
 export interface SetupHealthReportRow {
@@ -87,6 +94,9 @@ export interface MobileSupportBundle {
   webView: {
     summary: ReturnType<typeof buildDiscordWebViewHealthSummary>;
     snapshot: DiscordWebViewHealthSnapshot;
+  };
+  discordIngestion: {
+    routeDigest: DiscordIngestionAuditDigest;
   };
   phoneRuntime: {
     summary: ReturnType<typeof buildPhoneEngineRuntimeSummary>;
@@ -239,6 +249,8 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
     .slice(0, 10)
     .map(buildReconciliationAuditDigest);
   const apiKeyConfigured = Boolean(input.remote.connection.apiKey);
+  const discordIngestionSettings =
+    input.discordIngestionSettings ?? DEFAULT_DISCORD_INGESTION_SETTINGS;
   const setupAssistantSummary = buildSetupAutomationSummary({
     remote: input.remote,
     pairing: input.pairing,
@@ -273,6 +285,13 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
     webView: {
       summary: buildDiscordWebViewHealthSummary(input.webView),
       snapshot: input.webView,
+    },
+    discordIngestion: {
+      routeDigest: buildMobileDiscordIngestionRouteDigest(
+        discordIngestionSettings,
+        input.phoneRuntime,
+        input.webView,
+      ),
     },
     phoneRuntime: {
       summary: buildPhoneEngineRuntimeSummary(input.phoneRuntime),

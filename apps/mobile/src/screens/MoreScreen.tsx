@@ -20,6 +20,7 @@ import { usePeerAlertFailsafeState } from "@/state/peerAlertFailsafeState";
 import { usePhoneEngineRuntimeState } from "@/state/phoneEngineRuntimeState";
 import { useReconciliationState } from "@/state/reconciliationState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
+import { useSettingsState } from "@/state/settingsState";
 import {
   buildMobileSupportBundle,
   serializeMobileSupportBundle,
@@ -57,6 +58,7 @@ export function MoreScreen() {
   const alertEvidenceSnapshot = useAlertEvidenceState((state) => state.snapshot);
   const peerFailsafeSnapshot = usePeerAlertFailsafeState((state) => state.snapshot);
   const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
+  const discordIngestionSettings = useSettingsState((state) => state.snapshot.discordIngestionSettings);
   const summary = buildLiveReadinessSummary(snapshot);
   const liveChecklist = buildLiveArmChecklistSummary(snapshot);
   const replayEvidence = buildReplayAcceptanceEvidenceSummary(snapshot);
@@ -94,9 +96,11 @@ export function MoreScreen() {
         alertEvidence: alertEvidenceSnapshot,
         reconciliation: reconciliationSnapshot,
         windowsSetup,
+        discordIngestionSettings,
       }),
     [
       alertEvidenceSnapshot,
+      discordIngestionSettings,
       pairingSnapshot,
       phoneRuntimeSnapshot,
       reconciliationSnapshot,

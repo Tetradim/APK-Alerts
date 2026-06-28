@@ -41,6 +41,34 @@ export interface DiscordIngestionReadiness {
   detailLabel: string;
 }
 
+export interface DiscordIngestionRouteAuditRow {
+  route: DiscordIngestionRoute;
+  routeLabel: string;
+  enabled: boolean;
+  ready: boolean;
+  detailLabel: string;
+  blocking: boolean;
+}
+
+export interface DiscordIngestionAuditDigest {
+  priorityLabel: string;
+  gateLabel: string;
+  activeRoute: DiscordIngestionRoute | null;
+  activeRouteLabel: string;
+  detailLabel: string;
+  routeRows: DiscordIngestionRouteAuditRow[];
+  enabledRouteLabels: string[];
+  disabledRouteLabels: string[];
+  readyRouteLabels: string[];
+  blockingRouteLabels: string[];
+  evidenceLabels: string[];
+  botTokenConfigured: boolean;
+  guildConfigured: boolean;
+  channelAllowlistConfigured: boolean;
+  authorAllowlistConfigured: boolean;
+  blocking: boolean;
+}
+
 export const DEFAULT_FAILOVER_SETTINGS: FailoverSettings = {
   enginePriority: "phone_then_remote",
   phoneEngineEnabled: true,
@@ -231,6 +259,56 @@ export function evaluateDiscordIngestionReadiness(
     activeRoute: null,
     activeRouteLabel: "No route",
     detailLabel: "All Discord ingestion routes are disabled.",
+  };
+}
+
+export function buildDiscordIngestionAuditDigest(
+  settings: DiscordIngestionSettingsInput = {},
+  evidence: DiscordIngestionReadinessEvidence = {},
+): DiscordIngestionAuditDigest {
+  const normalized = normalizeDiscordIngestionSettings(settings);
+  const readiness = evaluateDiscordIngestionReadiness(normalized, evidence);
+  const routeRows = normalized.routePriority.map((route) => {
+    const enabled = discordRouteEnabled(route, normalized);
+    const ready = enabled && discordRouteReady(route, normalized, evidence);
+    const routeLabel = discordRouteLabel(route);
+    const detailLabel = enabled
+      ? discordRouteDetailLabel(route, normalized, evidence)
+      : `${routeLabel} disabled.`;
+
+    return {
+      route,
+      routeLabel,
+      enabled,
+      ready,
+      detailLabel,
+      blocking: enabled && !ready,
+    };
+  });
+
+  return {
+    priorityLabel: buildDiscordIngestionPriorityLabel(normalized),
+    gateLabel: readiness.ready ? "Discord route ready" : "Discord route blocked",
+    activeRoute: readiness.activeRoute,
+    activeRouteLabel: readiness.activeRouteLabel,
+    detailLabel: readiness.detailLabel,
+    routeRows,
+    enabledRouteLabels: routeRows.filter((row) => row.enabled).map((row) => row.routeLabel),
+    disabledRouteLabels: routeRows.filter((row) => !row.enabled).map((row) => row.routeLabel),
+    readyRouteLabels: routeRows.filter((row) => row.ready).map((row) => row.routeLabel),
+    blockingRouteLabels: routeRows
+      .filter((row) => row.blocking)
+      .map((row) => `${row.routeLabel}: ${row.detailLabel}`),
+    evidenceLabels: [
+      evidence.botGatewayReady ? "Bot Gateway: ready" : "Bot Gateway: waiting",
+      evidence.webViewSessionReady ? "WebView: alert proof ready" : "WebView: alert proof waiting",
+      evidence.foregroundServiceActive ? "Foreground: active" : "Foreground: inactive",
+    ],
+    botTokenConfigured: normalized.botToken.length > 0,
+    guildConfigured: normalized.guildId.length > 0,
+    channelAllowlistConfigured: normalized.channelAllowlist.length > 0,
+    authorAllowlistConfigured: normalized.authorAllowlist.length > 0,
+    blocking: !readiness.ready,
   };
 }
 

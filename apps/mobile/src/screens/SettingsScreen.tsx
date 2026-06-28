@@ -3,7 +3,13 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { SegmentedChoice } from "@/components/SegmentedChoice";
 import { SettingRow } from "@/components/SettingRow";
-import { buildSettingsSummary, useSettingsState } from "@/state/settingsState";
+import { useDiscordWebViewHealthState } from "@/state/discordWebViewState";
+import { usePhoneEngineRuntimeState } from "@/state/phoneEngineRuntimeState";
+import {
+  buildMobileDiscordIngestionRouteDigest,
+  buildSettingsSummary,
+  useSettingsState,
+} from "@/state/settingsState";
 
 const enginePriorityOptions = [
   { label: "Phone then Remote", value: "phone_then_remote" },
@@ -60,7 +66,14 @@ export function SettingsScreen() {
   const discordIngestionSettings = useSettingsState((state) => state.snapshot.discordIngestionSettings);
   const updateFailoverSettings = useSettingsState((state) => state.updateFailoverSettings);
   const updateDiscordIngestionSettings = useSettingsState((state) => state.updateDiscordIngestionSettings);
+  const phoneRuntime = usePhoneEngineRuntimeState((state) => state.snapshot);
+  const webView = useDiscordWebViewHealthState((state) => state.snapshot);
   const summary = buildSettingsSummary(failoverSettings, discordIngestionSettings);
+  const routeDigest = buildMobileDiscordIngestionRouteDigest(
+    discordIngestionSettings,
+    phoneRuntime,
+    webView,
+  );
 
   return (
     <ScreenFrame title="Settings" eyebrow="APK-Alerts">
@@ -69,6 +82,9 @@ export function SettingsScreen() {
         <Text style={styles.summaryValue}>{summary.engineLabel}</Text>
         <Text style={styles.summaryDetail}>{summary.transportLabel}</Text>
         <Text style={styles.summaryDetail}>{summary.discordIngestionLabel}</Text>
+        <Text style={styles.summaryDetail}>
+          {routeDigest.gateLabel}: {routeDigest.activeRouteLabel} - {routeDigest.detailLabel}
+        </Text>
         <Text style={styles.summaryDetail}>{summary.notificationsLabel}</Text>
       </View>
 
@@ -136,6 +152,10 @@ export function SettingsScreen() {
             updateDiscordIngestionSettings({ routePriority: routePriorityForPreset(preset) })
           }
         />
+        <Text style={styles.routeAuditText}>
+          Ready {routeDigest.readyRouteLabels.length || 0} / Enabled{" "}
+          {routeDigest.enabledRouteLabels.length || 0} - {routeDigest.evidenceLabels.join("; ")}
+        </Text>
         <SettingRow
           label="Embedded Bot Engine"
           description="Run a Discord bot Gateway worker inside the Android foreground service."
@@ -249,6 +269,11 @@ const styles = StyleSheet.create({
     color: "#cbd5e1",
     fontSize: 13,
     fontWeight: "800",
+  },
+  routeAuditText: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    lineHeight: 19,
   },
   input: {
     backgroundColor: "#020617",

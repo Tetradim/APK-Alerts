@@ -11,10 +11,13 @@ import {
 } from "./secureSettingsPersistence.js";
 import {
   buildSettingsSummary,
+  buildMobileDiscordIngestionRouteDigest,
   createNextSettings,
   getDefaultMobileSettingsSnapshot,
   useSettingsState,
 } from "./settingsState.js";
+import { getDefaultDiscordWebViewHealthSnapshot } from "./discordWebViewState.js";
+import { getDefaultPhoneEngineRuntimeSnapshot } from "./phoneEngineRuntimeState.js";
 
 function memoryStorage(initial: Record<string, string> = {}): SecureSettingsStorage & {
   values: Record<string, string>;
@@ -67,6 +70,31 @@ test("notification summary reflects disabled failover and offline alerts", () =>
   });
 
   assert.equal(summary.notificationsLabel, "Phone alerts off");
+});
+
+test("mobile Discord route digest maps native phone evidence without exposing token", () => {
+  const digest = buildMobileDiscordIngestionRouteDigest(
+    {
+      ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+      botToken: "discord-secret-token",
+      routePriority: ["bot_engine", "webview", "foreground_service"],
+    },
+    {
+      ...getDefaultPhoneEngineRuntimeSnapshot(),
+      foregroundServiceActive: true,
+      discordEngineReady: true,
+      discordGatewayConnected: true,
+      discordIngestionEvidenceReady: true,
+    },
+    getDefaultDiscordWebViewHealthSnapshot(),
+  );
+
+  assert.equal(digest.gateLabel, "Discord route ready");
+  assert.equal(digest.activeRouteLabel, "Bot Engine");
+  assert.equal(digest.botTokenConfigured, true);
+  assert.deepEqual(digest.readyRouteLabels, ["Bot Engine"]);
+  assert.equal(digest.evidenceLabels[0], "Bot Gateway: ready");
+  assert.doesNotMatch(JSON.stringify(digest), /discord-secret-token/);
 });
 
 test("settings store hydrates and persists failover settings through secure storage", async () => {

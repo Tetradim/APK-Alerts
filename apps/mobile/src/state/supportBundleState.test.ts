@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildAlertEvidenceChains,
   CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+  DEFAULT_DISCORD_INGESTION_SETTINGS,
   normalizeBridgeAlertDecisionEvent,
   normalizeLiveReadinessPayload,
   normalizeReconciliationPayload,
@@ -11,6 +12,7 @@ import {
   buildSetupHealthReportSummary,
   buildMobileSupportBundle,
   serializeMobileSupportBundle,
+  type MobileSupportBundleInput,
 } from "./supportBundleState.js";
 import { getDefaultAlertEvidenceSnapshot } from "./alertEvidenceState.js";
 import { getDefaultDiscordWebViewHealthSnapshot } from "./discordWebViewState.js";
@@ -21,7 +23,7 @@ import { getDefaultReconciliationSnapshot } from "./reconciliationState.js";
 import { getDefaultRemoteEngineSnapshot } from "./remoteEngineState.js";
 import { getDefaultWindowsSetupEvidence } from "./setupAutomationState.js";
 
-function buildDefaultSupportInput() {
+function buildDefaultSupportInput(): MobileSupportBundleInput {
   return {
     createdAt: "2026-06-28T11:00:00Z",
     remote: getDefaultRemoteEngineSnapshot(),
@@ -387,4 +389,38 @@ test("mobile support bundle includes exit protection audit digest", () => {
     "Unprotected positions: position-support-1",
   ]);
   assert.doesNotMatch(serialized, /mobile-api-key/);
+});
+
+test("mobile support bundle includes Discord ingestion route digest without token", () => {
+  const input = buildDefaultSupportInput();
+  input.discordIngestionSettings = {
+    ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+    botToken: "discord-secret-token",
+    guildId: "guild-1",
+    routePriority: ["bot_engine", "webview", "foreground_service"],
+  };
+  Object.assign(input.phoneRuntime, {
+    nativeRuntimeAvailable: true,
+    serviceEnabled: true,
+    foregroundServiceActive: true,
+    discordEngineEmbedded: true,
+    discordEngineReady: true,
+    discordGatewayConnected: false,
+    discordIngestionEvidenceReady: false,
+    discordGatewayStatus: "connecting",
+  });
+
+  const bundle = buildMobileSupportBundle(input);
+  const serialized = serializeMobileSupportBundle(bundle);
+
+  assert.equal(bundle.discordIngestion.routeDigest.priorityLabel, "Bot Engine -> WebView -> Foreground");
+  assert.equal(bundle.discordIngestion.routeDigest.gateLabel, "Discord route blocked");
+  assert.equal(bundle.discordIngestion.routeDigest.botTokenConfigured, true);
+  assert.equal(bundle.discordIngestion.routeDigest.evidenceLabels[0], "Bot Gateway: waiting");
+  assert.deepEqual(bundle.discordIngestion.routeDigest.blockingRouteLabels, [
+    "Bot Engine: Bot Engine Gateway not ready.",
+    "WebView: WebView session has not produced alert evidence.",
+    "Foreground: Foreground keepalive is active but is not an ingestion source.",
+  ]);
+  assert.doesNotMatch(serialized, /discord-secret-token/);
 });

@@ -1,7 +1,9 @@
 import {
   DEFAULT_DISCORD_INGESTION_SETTINGS,
   DEFAULT_FAILOVER_SETTINGS,
+  buildDiscordIngestionAuditDigest,
   type DiscordIngestionSettings,
+  type DiscordIngestionAuditDigest,
   type FailoverSettings,
   buildDiscordIngestionPriorityLabel,
   buildEnginePriorityLabel,
@@ -17,6 +19,8 @@ import {
   saveFailoverSettings,
   type SecureSettingsStorage,
 } from "./secureSettingsPersistence";
+import type { DiscordWebViewHealthSnapshot } from "./discordWebViewState";
+import type { PhoneEngineRuntimeSnapshot } from "./phoneEngineRuntimeState";
 
 export interface MobileSettingsSnapshot {
   failoverSettings: FailoverSettings;
@@ -76,6 +80,27 @@ export function buildSettingsSummary(
     discordIngestionLabel: buildDiscordIngestionPriorityLabel(discordIngestionSettings),
     notificationsLabel,
   };
+}
+
+export function buildMobileDiscordIngestionRouteDigest(
+  discordIngestionSettings: DiscordIngestionSettings,
+  phoneRuntime: PhoneEngineRuntimeSnapshot,
+  webView: DiscordWebViewHealthSnapshot,
+): DiscordIngestionAuditDigest {
+  const webViewLoaded =
+    webView.lastLoadedAt.length > 0 &&
+    !webView.lastError &&
+    !webView.lastTimedOutAt &&
+    !webView.loading;
+
+  return buildDiscordIngestionAuditDigest(discordIngestionSettings, {
+    botGatewayReady:
+      phoneRuntime.discordEngineReady &&
+      phoneRuntime.discordGatewayConnected &&
+      phoneRuntime.discordIngestionEvidenceReady,
+    webViewSessionReady: webViewLoaded,
+    foregroundServiceActive: phoneRuntime.foregroundServiceActive,
+  });
 }
 
 interface SettingsState {

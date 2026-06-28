@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   DEFAULT_FAILOVER_SETTINGS,
   DEFAULT_DISCORD_INGESTION_SETTINGS,
+  buildDiscordIngestionAuditDigest,
   buildDiscordIngestionPriorityLabel,
   buildEnginePriorityLabel,
   buildTransportLabel,
@@ -209,4 +210,64 @@ test("discord ingestion readiness falls through to the next enabled ready route"
   assert.equal(readiness.activeRoute, "webview");
   assert.equal(readiness.activeRouteLabel, "WebView");
   assert.match(readiness.detailLabel, /WebView session produced alert evidence/);
+});
+
+test("discord ingestion audit digest records ordered route blockers without secrets", () => {
+  const digest = buildDiscordIngestionAuditDigest(
+    {
+      ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+      botToken: "secret-token",
+      guildId: "guild-1",
+      channelAllowlist: "channel-1, channel-2",
+      authorAllowlist: "author-1",
+      routePriority: ["bot_engine", "webview", "foreground_service"],
+    },
+    {
+      botGatewayReady: false,
+      webViewSessionReady: false,
+      foregroundServiceActive: true,
+    },
+  );
+
+  assert.equal(digest.priorityLabel, "Bot Engine -> WebView -> Foreground");
+  assert.equal(digest.gateLabel, "Discord route blocked");
+  assert.equal(digest.activeRouteLabel, "Bot Engine");
+  assert.equal(digest.botTokenConfigured, true);
+  assert.equal(digest.guildConfigured, true);
+  assert.equal(digest.channelAllowlistConfigured, true);
+  assert.equal(digest.authorAllowlistConfigured, true);
+  assert.deepEqual(digest.enabledRouteLabels, ["Bot Engine", "WebView", "Foreground"]);
+  assert.deepEqual(digest.readyRouteLabels, []);
+  assert.deepEqual(digest.blockingRouteLabels, [
+    "Bot Engine: Bot Engine Gateway not ready.",
+    "WebView: WebView session has not produced alert evidence.",
+    "Foreground: Foreground keepalive is active but is not an ingestion source.",
+  ]);
+  assert.equal(digest.routeRows[2]?.ready, false);
+  assert.equal(digest.routeRows[2]?.detailLabel, "Foreground keepalive is active but is not an ingestion source.");
+  assert.equal(digest.blocking, true);
+  assert.doesNotMatch(JSON.stringify(digest), /secret-token/);
+});
+
+test("discord ingestion audit digest records ready fallback route and disabled routes", () => {
+  const digest = buildDiscordIngestionAuditDigest(
+    {
+      ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+      botEngineEnabled: false,
+      botToken: "secret-token",
+      routePriority: ["bot_engine", "webview", "foreground_service"],
+    },
+    {
+      botGatewayReady: false,
+      webViewSessionReady: true,
+      foregroundServiceActive: true,
+    },
+  );
+
+  assert.equal(digest.gateLabel, "Discord route ready");
+  assert.equal(digest.activeRouteLabel, "WebView");
+  assert.deepEqual(digest.disabledRouteLabels, ["Bot Engine"]);
+  assert.deepEqual(digest.readyRouteLabels, ["WebView"]);
+  assert.equal(digest.routeRows[0]?.detailLabel, "Bot Engine disabled.");
+  assert.equal(digest.blocking, false);
 });
