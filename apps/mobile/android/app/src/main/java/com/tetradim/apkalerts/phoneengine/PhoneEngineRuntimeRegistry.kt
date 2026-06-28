@@ -22,6 +22,9 @@ object PhoneEngineRuntimeRegistry {
   private const val KEY_DISCORD_GUILD_ID = "discord_guild_id"
   private const val KEY_DISCORD_CHANNEL_ALLOWLIST = "discord_channel_allowlist"
   private const val KEY_DISCORD_AUTHOR_ALLOWLIST = "discord_author_allowlist"
+  private const val ROUTE_BOT_ENGINE = "bot_engine"
+  private const val ROUTE_WEBVIEW = "webview"
+  private const val ROUTE_FOREGROUND_SERVICE = "foreground_service"
 
   private val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")
@@ -189,16 +192,45 @@ object PhoneEngineRuntimeRegistry {
 
   private fun refreshAdapterState(context: Context) {
     val preferences = preferences(context)
-    val botEnabled = preferences.getBoolean(KEY_DISCORD_BOT_ENABLED, true)
-    val botTokenPresent = preferences.getString(KEY_DISCORD_BOT_TOKEN, "")?.trim()?.isNotEmpty() == true
-    val webViewEnabled = preferences.getBoolean(KEY_DISCORD_WEBVIEW_ENABLED, true)
-    val foregroundEnabled = preferences.getBoolean(KEY_FOREGROUND_KEEPALIVE_ENABLED, true)
     discordEngineReady = preferences.getBoolean(KEY_DISCORD_ENGINE_READY, false) ||
-      (botEnabled && botTokenPresent && discordGatewayReady) ||
-      webViewEnabled ||
-      foregroundEnabled
+      discordRoutePriority(preferences).any { routeReady(it, preferences) }
     brokerEngineReady = preferences.getBoolean(KEY_BROKER_ENGINE_READY, false)
     liveExecutionArmed = preferences.getBoolean(KEY_LIVE_EXECUTION_ARMED, false)
+  }
+
+  private fun discordRoutePriority(preferences: android.content.SharedPreferences): List<String> {
+    val stored = preferences.getString(
+      KEY_DISCORD_ROUTE_PRIORITY,
+      "$ROUTE_BOT_ENGINE,$ROUTE_WEBVIEW,$ROUTE_FOREGROUND_SERVICE",
+    ).orEmpty()
+    val normalized = mutableListOf<String>()
+    stored.split(",")
+      .map { it.trim() }
+      .filter { it == ROUTE_BOT_ENGINE || it == ROUTE_WEBVIEW || it == ROUTE_FOREGROUND_SERVICE }
+      .forEach { route ->
+        if (!normalized.contains(route)) {
+          normalized.add(route)
+        }
+      }
+    listOf(ROUTE_BOT_ENGINE, ROUTE_WEBVIEW, ROUTE_FOREGROUND_SERVICE).forEach { route ->
+      if (!normalized.contains(route)) {
+        normalized.add(route)
+      }
+    }
+    return normalized
+  }
+
+  private fun routeReady(route: String, preferences: android.content.SharedPreferences): Boolean {
+    return when (route) {
+      ROUTE_BOT_ENGINE -> {
+        val botEnabled = preferences.getBoolean(KEY_DISCORD_BOT_ENABLED, true)
+        val botTokenPresent = preferences.getString(KEY_DISCORD_BOT_TOKEN, "")?.trim()?.isNotEmpty() == true
+        botEnabled && botTokenPresent && discordGatewayReady
+      }
+      ROUTE_WEBVIEW -> false
+      ROUTE_FOREGROUND_SERVICE -> false
+      else -> false
+    }
   }
 
   private fun preferences(context: Context) =

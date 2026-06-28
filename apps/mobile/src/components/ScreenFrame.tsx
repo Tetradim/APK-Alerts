@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getScreenFrameBottomPadding } from "./screenFrameLayout";
 
 interface ScreenFrameProps {
   title: string;
@@ -14,7 +15,13 @@ export function ScreenFrame({ title, eyebrow, children }: ScreenFrameProps) {
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 18 }]}
+      contentContainerStyle={[
+        styles.content,
+        {
+          paddingBottom: getScreenFrameBottomPadding(insets.bottom),
+          paddingTop: insets.top + 18,
+        },
+      ]}
     >
       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
       <Text style={styles.title}>{title}</Text>

@@ -5,14 +5,16 @@ import {
   type AlertPeerFailsafeOptions,
   type AlertPeerResponseEvent,
 } from "@apk-alerts/contracts";
+import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
 
-export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+export type { FetchLike };
 
 export interface PeerAlertFailsafeClientConfig {
   baseApiUrl: string;
   apiKey?: string;
   fetchImpl?: FetchLike;
   maxAlertSkewMs?: number;
+  timeoutMs?: number;
   now?: () => string;
 }
 
@@ -63,12 +65,12 @@ export async function requestPhoneAlertPeerResponse(
   }
 
   try {
-    const payload = await postJson(
-      fetchImpl,
-      `${baseApiUrl}/peer-alert/challenges`,
-      challenge,
-      config.apiKey,
-    );
+    const payload = await fetchRemoteJson(fetchImpl, `${baseApiUrl}/peer-alert/challenges`, {
+      apiKey: config.apiKey,
+      body: challenge,
+      method: "POST",
+      timeoutMs: config.timeoutMs,
+    });
     const response = extractPeerAlertResponseEvent(payload);
     if (!response) {
       return failClosed(checkedAt, missingEvaluation(), "Peer alert response payload invalid.");
@@ -106,32 +108,6 @@ function failClosed(
     evaluation,
     error,
   };
-}
-
-function buildHeaders(apiKey?: string): HeadersInit {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const trimmed = apiKey?.trim();
-  if (trimmed) {
-    headers["X-API-Key"] = trimmed;
-  }
-  return headers;
-}
-
-async function postJson(
-  fetchImpl: FetchLike,
-  url: string,
-  body: unknown,
-  apiKey?: string,
-): Promise<unknown> {
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: buildHeaders(apiKey),
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return await response.json();
 }
 
 function extractPeerAlertResponseEvent(payload: unknown): AlertPeerResponseEvent | null {

@@ -4,14 +4,16 @@ import {
   type ReconciliationRow,
   type ReconciliationSummary,
 } from "@apk-alerts/contracts";
+import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
 
-export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+export type { FetchLike };
 
 export interface RemoteReconciliationClientConfig {
   baseApiUrl: string;
   apiKey?: string;
   fetchImpl?: FetchLike;
   limit?: number;
+  timeoutMs?: number;
   now?: () => string;
 }
 
@@ -70,10 +72,13 @@ export async function fetchRemoteReconciliation(
   }
 
   try {
-    const payload = await fetchJson(
+    const payload = await fetchRemoteJson(
       fetchImpl,
       `${baseApiUrl}/operator/reconciliation?limit=${normalizeLimit(config.limit)}`,
-      config.apiKey,
+      {
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs,
+      },
     );
     const snapshot = buildSnapshot(checkedAt, normalizeReconciliationPayload(payload));
     return {
@@ -100,17 +105,4 @@ function buildSnapshot(checkedAt: string, rows: ReconciliationRow[]): RemoteReco
 
 function normalizeLimit(limit: number | undefined): number {
   return Number.isInteger(limit) && limit && limit > 0 && limit <= 500 ? limit : 100;
-}
-
-function buildHeaders(apiKey?: string): HeadersInit {
-  const trimmed = apiKey?.trim();
-  return trimmed ? { "X-API-Key": trimmed } : {};
-}
-
-async function fetchJson(fetchImpl: FetchLike, url: string, apiKey?: string): Promise<unknown> {
-  const response = await fetchImpl(url, { headers: buildHeaders(apiKey) });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return await response.json();
 }

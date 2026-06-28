@@ -28,6 +28,19 @@ export interface DiscordIngestionSettings {
 export type DiscordIngestionSettingsInput =
   Partial<Record<keyof DiscordIngestionSettings, unknown>> | null | undefined;
 
+export interface DiscordIngestionReadinessEvidence {
+  botGatewayReady?: boolean;
+  webViewSessionReady?: boolean;
+  foregroundServiceActive?: boolean;
+}
+
+export interface DiscordIngestionReadiness {
+  ready: boolean;
+  activeRoute: DiscordIngestionRoute | null;
+  activeRouteLabel: string;
+  detailLabel: string;
+}
+
 export const DEFAULT_FAILOVER_SETTINGS: FailoverSettings = {
   enginePriority: "phone_then_remote",
   phoneEngineEnabled: true,
@@ -184,6 +197,42 @@ export function buildDiscordIngestionPriorityLabel(
   return normalizeDiscordIngestionSettings(settings).routePriority.map(discordRouteLabel).join(" -> ");
 }
 
+export function evaluateDiscordIngestionReadiness(
+  settings: DiscordIngestionSettingsInput = {},
+  evidence: DiscordIngestionReadinessEvidence = {},
+): DiscordIngestionReadiness {
+  const normalized = normalizeDiscordIngestionSettings(settings);
+  for (const route of normalized.routePriority) {
+    if (!discordRouteEnabled(route, normalized)) {
+      continue;
+    }
+
+    const detailLabel = discordRouteDetailLabel(route, normalized, evidence);
+    if (discordRouteReady(route, normalized, evidence)) {
+      return {
+        ready: true,
+        activeRoute: route,
+        activeRouteLabel: discordRouteLabel(route),
+        detailLabel,
+      };
+    }
+
+    return {
+      ready: false,
+      activeRoute: route,
+      activeRouteLabel: discordRouteLabel(route),
+      detailLabel,
+    };
+  }
+
+  return {
+    ready: false,
+    activeRoute: null,
+    activeRouteLabel: "No route",
+    detailLabel: "All Discord ingestion routes are disabled.",
+  };
+}
+
 function normalizeDiscordRoutePriority(value: unknown): DiscordIngestionRoute[] {
   const orderedRoutes: DiscordIngestionRoute[] = [];
   const inputRoutes = Array.isArray(value) ? value : DEFAULT_DISCORD_ROUTE_PRIORITY;
@@ -211,5 +260,56 @@ function discordRouteLabel(route: DiscordIngestionRoute): string {
       return "WebView";
     case "foreground_service":
       return "Foreground";
+  }
+}
+
+function discordRouteEnabled(
+  route: DiscordIngestionRoute,
+  settings: DiscordIngestionSettings,
+): boolean {
+  switch (route) {
+    case "bot_engine":
+      return settings.botEngineEnabled;
+    case "webview":
+      return settings.webViewEnabled;
+    case "foreground_service":
+      return settings.foregroundServiceEnabled;
+  }
+}
+
+function discordRouteReady(
+  route: DiscordIngestionRoute,
+  settings: DiscordIngestionSettings,
+  evidence: DiscordIngestionReadinessEvidence,
+): boolean {
+  switch (route) {
+    case "bot_engine":
+      return settings.botToken.length > 0 && evidence.botGatewayReady === true;
+    case "webview":
+      return evidence.webViewSessionReady === true;
+    case "foreground_service":
+      return false;
+  }
+}
+
+function discordRouteDetailLabel(
+  route: DiscordIngestionRoute,
+  settings: DiscordIngestionSettings,
+  evidence: DiscordIngestionReadinessEvidence,
+): string {
+  switch (route) {
+    case "bot_engine":
+      if (!settings.botToken) {
+        return "Bot Engine token missing.";
+      }
+      return evidence.botGatewayReady ? "Bot Engine Gateway ready." : "Bot Engine Gateway not ready.";
+    case "webview":
+      return evidence.webViewSessionReady
+        ? "WebView session produced alert evidence."
+        : "WebView session has not produced alert evidence.";
+    case "foreground_service":
+      return evidence.foregroundServiceActive
+        ? "Foreground keepalive is active but is not an ingestion source."
+        : "Foreground keepalive is not active and is not an ingestion source.";
   }
 }

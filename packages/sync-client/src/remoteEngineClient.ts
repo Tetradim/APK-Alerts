@@ -4,13 +4,15 @@ import {
   normalizeRemoteStatusPayload,
   type RemoteEngineHealthSnapshot,
 } from "@apk-alerts/contracts";
+import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
 
-export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+export type { FetchLike };
 
 export interface RemoteEngineClientConfig {
   baseApiUrl: string;
   apiKey?: string;
   fetchImpl?: FetchLike;
+  timeoutMs?: number;
   now?: () => string;
 }
 
@@ -38,19 +40,6 @@ export function normalizeRemoteApiBaseUrl(value: string): string {
   } catch {
     return "";
   }
-}
-
-function buildHeaders(apiKey?: string): HeadersInit {
-  const trimmed = apiKey?.trim();
-  return trimmed ? { "X-API-Key": trimmed } : {};
-}
-
-async function fetchJson(fetchImpl: FetchLike, url: string, apiKey?: string): Promise<unknown> {
-  const response = await fetchImpl(url, { headers: buildHeaders(apiKey) });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return await response.json();
 }
 
 function buildOfflineSnapshot(checkedAt: string): RemoteEngineHealthSnapshot {
@@ -85,8 +74,14 @@ export async function checkRemoteEngineHealth(
 
   try {
     const [healthPayload, statusPayload] = await Promise.all([
-      fetchJson(fetchImpl, `${baseApiUrl}/health`, config.apiKey),
-      fetchJson(fetchImpl, `${baseApiUrl}/status`, config.apiKey),
+      fetchRemoteJson(fetchImpl, `${baseApiUrl}/health`, {
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs,
+      }),
+      fetchRemoteJson(fetchImpl, `${baseApiUrl}/status`, {
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs,
+      }),
     ]);
     const snapshot = buildRemoteEngineHealthSnapshot({
       health: normalizeRemoteHealthPayload(healthPayload),

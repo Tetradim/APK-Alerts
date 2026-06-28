@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
@@ -109,7 +110,10 @@ export function EnginesScreen() {
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ busy: snapshot.checking, disabled: snapshot.checking }}
+          {...buildActionButtonAccessibility("Check Remote", {
+            busy: snapshot.checking,
+            disabled: snapshot.checking,
+          })}
           disabled={snapshot.checking}
           onPress={() => void checkRemote()}
           style={[styles.button, snapshot.checking ? styles.buttonDisabled : null]}
@@ -147,7 +151,10 @@ export function EnginesScreen() {
         <View style={styles.actionRow}>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ busy: phoneAction === "start", disabled: phoneBusy }}
+            {...buildActionButtonAccessibility("Start Phone", {
+              busy: phoneAction === "start",
+              disabled: phoneBusy,
+            })}
             disabled={phoneBusy}
             onPress={() => void runPhoneRuntimeAction("start")}
             style={[styles.button, styles.actionButton, phoneBusy ? styles.buttonDisabled : null]}
@@ -156,7 +163,10 @@ export function EnginesScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ busy: phoneAction === "stop", disabled: phoneBusy }}
+            {...buildActionButtonAccessibility("Stop", {
+              busy: phoneAction === "stop",
+              disabled: phoneBusy,
+            })}
             disabled={phoneBusy}
             onPress={() => void runPhoneRuntimeAction("stop")}
             style={[styles.button, styles.actionButton, styles.stopButton, phoneBusy ? styles.buttonDisabled : null]}
@@ -165,7 +175,10 @@ export function EnginesScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ busy: phoneAction === "refresh", disabled: phoneBusy }}
+            {...buildActionButtonAccessibility("Refresh", {
+              busy: phoneAction === "refresh",
+              disabled: phoneBusy,
+            })}
             disabled={phoneBusy}
             onPress={() => void runPhoneRuntimeAction("refresh")}
             style={[styles.button, styles.actionButton, styles.secondaryButton, phoneBusy ? styles.buttonDisabled : null]}

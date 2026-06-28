@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
@@ -158,7 +159,10 @@ export function AlertsScreen() {
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ busy: snapshot.checking, disabled: snapshot.checking }}
+            {...buildActionButtonAccessibility("Refresh", {
+              busy: snapshot.checking,
+              disabled: snapshot.checking,
+            })}
             disabled={snapshot.checking}
             onPress={() => void refreshEvidence()}
             style={[styles.button, snapshot.checking ? styles.buttonDisabled : null]}

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
@@ -87,7 +88,10 @@ export function PositionsScreen() {
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ busy: reconciliationSnapshot.checking, disabled: reconciliationSnapshot.checking }}
+            {...buildActionButtonAccessibility("Check", {
+              busy: reconciliationSnapshot.checking,
+              disabled: reconciliationSnapshot.checking,
+            })}
             disabled={reconciliationSnapshot.checking}
             onPress={() => void checkReconciliation()}
             style={[styles.button, reconciliationSnapshot.checking ? styles.buttonDisabled : null]}
@@ -120,7 +124,10 @@ export function PositionsScreen() {
           <Text style={[styles.detail, styles.footerDetail]}>{exitLastCheckLabel}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ busy: liveReadinessSnapshot.checking, disabled: liveReadinessSnapshot.checking }}
+            {...buildActionButtonAccessibility("Check exits", {
+              busy: liveReadinessSnapshot.checking,
+              disabled: liveReadinessSnapshot.checking,
+            })}
             disabled={liveReadinessSnapshot.checking}
             onPress={() => void checkLiveReadiness()}
             style={[styles.secondaryButton, liveReadinessSnapshot.checking ? styles.buttonDisabled : null]}

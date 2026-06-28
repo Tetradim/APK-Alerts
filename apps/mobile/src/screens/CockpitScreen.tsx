@@ -1,4 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
@@ -18,6 +20,7 @@ function communicationTone(blocking: boolean): "good" | "warn" | "bad" | "neutra
 }
 
 export function CockpitScreen() {
+  const router = useRouter();
   const remoteEngine = useRemoteEngineState((state) => state.snapshot);
   const alertEvidence = useAlertEvidenceState((state) => state.snapshot);
   const liveReadiness = useLiveReadinessState((state) => state.snapshot);
@@ -59,16 +62,16 @@ export function CockpitScreen() {
         <Pressable
           style={[styles.actionButton, styles.stopButton, styles.disabledButton]}
           accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
+          {...buildActionButtonAccessibility("Panic Stop", { disabled: true })}
           disabled
         >
           <Text style={styles.actionText}>Panic Stop</Text>
         </Pressable>
         <Pressable
-          style={[styles.actionButton, styles.secondaryButton, styles.disabledButton]}
+          style={[styles.actionButton, styles.secondaryButton]}
           accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          disabled
+          {...buildActionButtonAccessibility(summary.primaryActionLabel)}
+          onPress={() => router.push("/engines")}
         >
           <Text style={styles.actionText}>{summary.primaryActionLabel}</Text>
         </Pressable>

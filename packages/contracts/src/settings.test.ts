@@ -7,6 +7,7 @@ import {
   buildEnginePriorityLabel,
   buildTransportLabel,
   canAnyEngineRun,
+  evaluateDiscordIngestionReadiness,
   normalizeDiscordIngestionSettings,
   normalizeFailoverSettings,
 } from "./index.js";
@@ -155,4 +156,37 @@ test("discord ingestion settings normalize malformed route priorities and token 
   assert.equal(settings.botEngineEnabled, false);
   assert.equal(settings.foregroundServiceEnabled, false);
   assert.equal(buildDiscordIngestionPriorityLabel(settings), "WebView -> Bot Engine -> Foreground");
+});
+
+test("discord ingestion readiness follows route priority without treating keepalive as ingestion", () => {
+  const ready = evaluateDiscordIngestionReadiness(
+    {
+      ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+      botToken: "token",
+      routePriority: ["bot_engine", "webview", "foreground_service"],
+    },
+    {
+      botGatewayReady: true,
+      webViewSessionReady: false,
+      foregroundServiceActive: true,
+    },
+  );
+  const blocked = evaluateDiscordIngestionReadiness(
+    {
+      ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+      botEngineEnabled: false,
+      routePriority: ["webview", "foreground_service", "bot_engine"],
+    },
+    {
+      botGatewayReady: false,
+      webViewSessionReady: false,
+      foregroundServiceActive: true,
+    },
+  );
+
+  assert.equal(ready.ready, true);
+  assert.equal(ready.activeRoute, "bot_engine");
+  assert.equal(blocked.ready, false);
+  assert.equal(blocked.activeRoute, "webview");
+  assert.match(blocked.detailLabel, /WebView session has not produced alert evidence/);
 });

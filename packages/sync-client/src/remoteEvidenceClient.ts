@@ -8,14 +8,16 @@ import {
   type BridgeHealth,
   type BridgeSignalEvidence,
 } from "@apk-alerts/contracts";
+import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
 
-export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+export type { FetchLike };
 
 export interface RemoteEvidenceClientConfig {
   baseApiUrl: string;
   apiKey?: string;
   fetchImpl?: FetchLike;
   limit?: number;
+  timeoutMs?: number;
   now?: () => string;
 }
 
@@ -78,9 +80,18 @@ export async function fetchRemoteAlertEvidence(
   const limit = normalizeLimit(config.limit);
   try {
     const [busPayload, operatorPayload, bridgeHealthPayload] = await Promise.all([
-      fetchJson(fetchImpl, `${baseApiUrl}/bus/events?limit=${limit}`, config.apiKey),
-      fetchJson(fetchImpl, `${baseApiUrl}/operator/events?limit=${limit}`, config.apiKey),
-      fetchJson(fetchImpl, `${baseApiUrl}/discord/chrome-bridge/health`, config.apiKey),
+      fetchRemoteJson(fetchImpl, `${baseApiUrl}/bus/events?limit=${limit}`, {
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs,
+      }),
+      fetchRemoteJson(fetchImpl, `${baseApiUrl}/operator/events?limit=${limit}`, {
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs,
+      }),
+      fetchRemoteJson(fetchImpl, `${baseApiUrl}/discord/chrome-bridge/health`, {
+        apiKey: config.apiKey,
+        timeoutMs: config.timeoutMs,
+      }),
     ]);
     const signals = extractArray(busPayload, "events")
       .filter((event) => isBridgeSignalEvent(event))
@@ -119,19 +130,6 @@ function buildEmptySnapshot(checkedAt: string): RemoteAlertEvidenceSnapshot {
     decisions: [],
     chains: [],
   };
-}
-
-function buildHeaders(apiKey?: string): HeadersInit {
-  const trimmed = apiKey?.trim();
-  return trimmed ? { "X-API-Key": trimmed } : {};
-}
-
-async function fetchJson(fetchImpl: FetchLike, url: string, apiKey?: string): Promise<unknown> {
-  const response = await fetchImpl(url, { headers: buildHeaders(apiKey) });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return await response.json();
 }
 
 function normalizeLimit(limit: number | undefined): number {
