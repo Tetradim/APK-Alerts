@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as Linking from "expo-linking";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
@@ -19,6 +20,7 @@ import {
 } from "@/state/pairingDoctorState";
 import { buildRemoteEngineSummary, useRemoteEngineState } from "@/state/remoteEngineState";
 import { useSetupAutomationState } from "@/state/setupAutomationState";
+import { buildMobileTailscaleSetupAction } from "@/state/tailscaleSetupState";
 
 function healthTone(label: string): "good" | "warn" | "bad" | "neutral" {
   if (label === "Healthy") {
@@ -62,6 +64,8 @@ export function EnginesScreen() {
   const [phoneAction, setPhoneAction] = useState<"idle" | "refresh" | "start" | "stop">("idle");
   const [pairingPackageText, setPairingPackageText] = useState("");
   const [pairingImportStatus, setPairingImportStatus] = useState("");
+  const [tailscaleActionBusy, setTailscaleActionBusy] = useState(false);
+  const [tailscaleActionError, setTailscaleActionError] = useState("");
   const snapshot = useRemoteEngineState((state) => state.snapshot);
   const updateConnectionDraft = useRemoteEngineState((state) => state.updateConnectionDraft);
   const checkRemote = useRemoteEngineState((state) => state.checkRemote);
@@ -74,7 +78,18 @@ export function EnginesScreen() {
   const summary = buildRemoteEngineSummary(snapshot);
   const phoneRuntime = buildPhoneEngineRuntimeSummary(phoneRuntimeSnapshot);
   const pairingSummary = buildPairingDoctorSummary(pairingSnapshot);
+  const tailscaleAction = buildMobileTailscaleSetupAction({
+    windows: setupSnapshot.windows,
+    remote: snapshot,
+    pairing: pairingSnapshot,
+  });
   const phoneBusy = phoneAction !== "idle";
+  const tailscaleButtonDisabled =
+    tailscaleActionBusy ||
+    tailscaleAction.key === "ready" ||
+    (tailscaleAction.key === "run_pairing_doctor" &&
+      (pairingSnapshot.checking || !snapshot.connection.baseApiUrl)) ||
+    (!tailscaleAction.primaryUrl && tailscaleAction.key !== "run_pairing_doctor");
   const persistedPairingImportStatus = setupSnapshot.lastImportError
     ? setupSnapshot.lastImportError
     : setupSnapshot.lastImportedAt
@@ -93,6 +108,44 @@ export function EnginesScreen() {
       updatePhoneRuntime(nextSnapshot);
     } finally {
       setPhoneAction("idle");
+    }
+  };
+
+  const runTailscaleSetupAction = async () => {
+    setTailscaleActionError("");
+
+    if (tailscaleAction.key === "run_pairing_doctor") {
+      await runPairingDoctor({
+        baseApiUrl: snapshot.connection.baseApiUrl,
+        apiKey: snapshot.connection.apiKey,
+      });
+      return;
+    }
+
+    if (!tailscaleAction.primaryUrl) {
+      return;
+    }
+
+    setTailscaleActionBusy(true);
+    try {
+      await Linking.openURL(tailscaleAction.primaryUrl);
+    } catch {
+      if (tailscaleAction.fallbackUrl && tailscaleAction.fallbackUrl !== tailscaleAction.primaryUrl) {
+        try {
+          await Linking.openURL(tailscaleAction.fallbackUrl);
+          return;
+        } catch {
+          setTailscaleActionError(
+            "Could not open Tailscale setup. Open Google Play and install Tailscale manually.",
+          );
+        }
+      } else {
+        setTailscaleActionError(
+          "Could not open Tailscale setup. Open Google Play and install Tailscale manually.",
+        );
+      }
+    } finally {
+      setTailscaleActionBusy(false);
     }
   };
 
@@ -171,6 +224,41 @@ export function EnginesScreen() {
           detail={phoneRuntime.detailLabel}
         />
         <MetricTile label="Remote" value={summary.remoteHealthLabel} detail={summary.remoteDetailLabel} />
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.panelCopy}>
+            <Text style={styles.label}>Tailscale Setup</Text>
+            <Text style={styles.panelTitle}>{tailscaleAction.statusLabel}</Text>
+          </View>
+          <StatusPill
+            label={tailscaleAction.blocking ? "Action needed" : "Ready"}
+            tone={tailscaleAction.blocking ? "warn" : "good"}
+          />
+        </View>
+        <Text style={styles.detail}>{tailscaleAction.detailLabel}</Text>
+        {tailscaleActionError ? <Text style={styles.error}>{tailscaleActionError}</Text> : null}
+        <Pressable
+          accessibilityRole="button"
+          {...buildActionButtonAccessibility(tailscaleAction.actionLabel, {
+            busy:
+              tailscaleActionBusy ||
+              (tailscaleAction.key === "run_pairing_doctor" && pairingSnapshot.checking),
+            disabled: tailscaleButtonDisabled,
+          })}
+          disabled={tailscaleButtonDisabled}
+          onPress={() => void runTailscaleSetupAction()}
+          style={[styles.button, tailscaleButtonDisabled ? styles.buttonDisabled : null]}
+        >
+          <Text style={styles.buttonText}>
+            {tailscaleActionBusy
+              ? "Opening"
+              : tailscaleAction.key === "run_pairing_doctor" && pairingSnapshot.checking
+                ? "Checking"
+                : tailscaleAction.actionLabel}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.panel}>
