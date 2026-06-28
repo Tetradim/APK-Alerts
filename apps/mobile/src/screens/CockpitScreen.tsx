@@ -30,6 +30,7 @@ export function CockpitScreen() {
     alertEvidence,
     liveReadiness,
     phoneEngine,
+    leaseEvidence: alertEvidence.evidence.leaseEvidence,
   });
   const failoverSettings = useSettingsState((state) => state.snapshot.failoverSettings);
   const summary = buildCockpitSummary(snapshot, failoverSettings);

@@ -35,6 +35,7 @@ class PhoneEngineForegroundService : Service() {
     acquireWakeLock()
     PhoneEngineRuntimeRegistry.markHeartbeat(this)
     DiscordGatewayWorker.start(this)
+    PeerAlertChallengeServer.start(this)
     handler.removeCallbacks(heartbeat)
     handler.postDelayed(heartbeat, HEARTBEAT_INTERVAL_MS)
     return START_STICKY
@@ -42,6 +43,7 @@ class PhoneEngineForegroundService : Service() {
 
   override fun onDestroy() {
     handler.removeCallbacks(heartbeat)
+    PeerAlertChallengeServer.stop(this)
     DiscordGatewayWorker.stop(this)
     releaseWakeLock()
     PhoneEngineRuntimeRegistry.markStopped(this)

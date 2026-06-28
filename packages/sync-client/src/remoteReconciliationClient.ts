@@ -4,9 +4,15 @@ import {
   type ReconciliationRow,
   type ReconciliationSummary,
 } from "@apk-alerts/contracts";
-import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
+import {
+  buildRemoteEndpointClient,
+  fetchRemoteJson,
+  normalizeRemoteApiBaseUrl,
+  type FetchLike,
+} from "./remoteHttp";
 
 export type { FetchLike };
+export { normalizeRemoteApiBaseUrl as normalizeRemoteReconciliationBaseUrl };
 
 export interface RemoteReconciliationClientConfig {
   baseApiUrl: string;
@@ -29,55 +35,26 @@ export interface RemoteReconciliationResult {
   error: string;
 }
 
-export function normalizeRemoteReconciliationBaseUrl(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  try {
-    const url = new URL(trimmed);
-    url.pathname = url.pathname.replace(/\/+$/, "");
-    if (!url.pathname.endsWith("/api")) {
-      url.pathname = `${url.pathname}/api`.replace(/\/+/g, "/");
-    }
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
 export async function fetchRemoteReconciliation(
   config: RemoteReconciliationClientConfig,
 ): Promise<RemoteReconciliationResult> {
   const checkedAt = config.now?.() ?? new Date().toISOString();
-  const baseApiUrl = normalizeRemoteReconciliationBaseUrl(config.baseApiUrl);
-  if (!baseApiUrl) {
+  const endpoint = buildRemoteEndpointClient(config);
+  if (!endpoint.ok) {
     return {
       ok: false,
       snapshot: buildSnapshot(checkedAt, []),
-      error: "Remote API URL is invalid.",
-    };
-  }
-
-  const fetchImpl = config.fetchImpl ?? globalThis.fetch?.bind(globalThis);
-  if (!fetchImpl) {
-    return {
-      ok: false,
-      snapshot: buildSnapshot(checkedAt, []),
-      error: "Fetch is not available.",
+      error: endpoint.error,
     };
   }
 
   try {
     const payload = await fetchRemoteJson(
-      fetchImpl,
-      `${baseApiUrl}/operator/reconciliation?limit=${normalizeLimit(config.limit)}`,
+      endpoint.fetchImpl,
+      `${endpoint.baseApiUrl}/operator/reconciliation?limit=${normalizeLimit(config.limit)}`,
       {
-        apiKey: config.apiKey,
-        timeoutMs: config.timeoutMs,
+        apiKey: endpoint.apiKey,
+        timeoutMs: endpoint.timeoutMs,
       },
     );
     const snapshot = buildSnapshot(checkedAt, normalizeReconciliationPayload(payload));

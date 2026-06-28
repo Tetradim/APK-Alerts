@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
@@ -10,7 +9,6 @@ import {
   buildReconciliationSummary,
   useReconciliationState,
 } from "@/state/reconciliationState";
-import { useRemoteEngineState } from "@/state/remoteEngineState";
 
 function statusTone(label: string): "good" | "warn" | "bad" | "neutral" {
   if (label === "Reconciled") {
@@ -27,48 +25,15 @@ function lifecycleTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
 }
 
 export function PositionsScreen() {
-  const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
   const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
-  const updateReconciliationConnectionDraft = useReconciliationState((state) => state.updateConnectionDraft);
   const checkReconciliation = useReconciliationState((state) => state.checkReconciliation);
   const liveReadinessSnapshot = useLiveReadinessState((state) => state.snapshot);
-  const updateLiveReadinessConnectionDraft = useLiveReadinessState((state) => state.updateConnectionDraft);
   const checkLiveReadiness = useLiveReadinessState((state) => state.checkReadiness);
   const summary = buildReconciliationSummary(reconciliationSnapshot);
   const exitProtection = buildExitProtectionEvidenceSummary(liveReadinessSnapshot);
   const exitLastCheckLabel = liveReadinessSnapshot.remote.checkedAt
     ? `Checked ${liveReadinessSnapshot.remote.checkedAt}`
     : "Never checked";
-
-  useEffect(() => {
-    if (
-      remoteConnection.baseApiUrl !== reconciliationSnapshot.connection.baseApiUrl ||
-      remoteConnection.apiKey !== reconciliationSnapshot.connection.apiKey
-    ) {
-      updateReconciliationConnectionDraft({
-        baseApiUrl: remoteConnection.baseApiUrl,
-        apiKey: remoteConnection.apiKey,
-      });
-    }
-    if (
-      remoteConnection.baseApiUrl !== liveReadinessSnapshot.connection.baseApiUrl ||
-      remoteConnection.apiKey !== liveReadinessSnapshot.connection.apiKey
-    ) {
-      updateLiveReadinessConnectionDraft({
-        baseApiUrl: remoteConnection.baseApiUrl,
-        apiKey: remoteConnection.apiKey,
-      });
-    }
-  }, [
-    remoteConnection.baseApiUrl,
-    remoteConnection.apiKey,
-    reconciliationSnapshot.connection.baseApiUrl,
-    reconciliationSnapshot.connection.apiKey,
-    liveReadinessSnapshot.connection.baseApiUrl,
-    liveReadinessSnapshot.connection.apiKey,
-    updateReconciliationConnectionDraft,
-    updateLiveReadinessConnectionDraft,
-  ]);
 
   return (
     <ScreenFrame title="Positions" eyebrow="APK-Alerts">

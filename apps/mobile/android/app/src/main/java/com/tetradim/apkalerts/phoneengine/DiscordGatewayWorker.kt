@@ -27,6 +27,7 @@ object DiscordGatewayWorker {
   private var lastSequence: Long? = null
   private var connecting = false
   private var connected = false
+  private var reconnectAttempt = 0
 
   private val heartbeat = object : Runnable {
     override fun run() {
@@ -75,6 +76,7 @@ object DiscordGatewayWorker {
     connecting = false
     connected = false
     lastSequence = null
+    reconnectAttempt = 0
     PhoneEngineRuntimeRegistry.markDiscordGatewayState(context.applicationContext, false, "stopped")
   }
 
@@ -104,8 +106,9 @@ object DiscordGatewayWorker {
       synchronized(DiscordGatewayWorker) {
         connecting = false
         connected = true
+        reconnectAttempt = 0
       }
-      PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, false, "socket_open")
+      PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, true, "socket_open")
     }
 
     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -119,17 +122,18 @@ object DiscordGatewayWorker {
           val interval = payload.optJSONObject("d")?.optLong("heartbeat_interval") ?: heartbeatIntervalMs
           scheduleHeartbeat(interval)
           identify(webSocket, token)
-          PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, false, "identified")
+          PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, true, "identified")
         }
         7 -> restart(context)
         9 -> restart(context)
       }
 
       when (payload.optString("t")) {
-        "READY" -> PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, true, "ready")
+        "READY" -> PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, true, "ready_waiting_for_alert")
         "MESSAGE_CREATE" -> {
-          if (messageAllowed(context, payload.optJSONObject("d"))) {
-            PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, true, "message_create", hasEvent = true)
+          val message = payload.optJSONObject("d")
+          if (message != null && messageAllowed(context, message)) {
+            PhoneEngineRuntimeRegistry.markDiscordAlertObserved(context, message)
           }
         }
       }
@@ -142,8 +146,9 @@ object DiscordGatewayWorker {
         connected = false
       }
       handler.removeCallbacks(heartbeat)
-      PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, false, "gateway_failure")
-      handler.postDelayed({ start(context) }, 15_000L)
+      val delayMs = nextReconnectDelayMs()
+      PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, false, "gateway_failure_backoff_${delayMs}ms")
+      handler.postDelayed({ start(context) }, delayMs)
     }
 
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -156,11 +161,7 @@ object DiscordGatewayWorker {
       PhoneEngineRuntimeRegistry.markDiscordGatewayState(context, false, "closed")
     }
 
-    private fun messageAllowed(context: Context, message: JSONObject?): Boolean {
-      if (message == null) {
-        return false
-      }
-
+    private fun messageAllowed(context: Context, message: JSONObject): Boolean {
       val configuredGuild = PhoneEngineRuntimeRegistry.discordGuildId(context)
       if (configuredGuild.isNotBlank() && message.optString("guild_id") != configuredGuild) {
         return false
@@ -181,5 +182,12 @@ object DiscordGatewayWorker {
 
       return message.optString("content").isNotBlank()
     }
+  }
+
+  @Synchronized
+  private fun nextReconnectDelayMs(): Long {
+    val delay = 15_000L * (1L shl reconnectAttempt.coerceAtMost(4))
+    reconnectAttempt += 1
+    return delay.coerceAtMost(300_000L)
   }
 }

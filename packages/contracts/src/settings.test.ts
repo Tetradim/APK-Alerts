@@ -190,3 +190,23 @@ test("discord ingestion readiness follows route priority without treating keepal
   assert.equal(blocked.activeRoute, "webview");
   assert.match(blocked.detailLabel, /WebView session has not produced alert evidence/);
 });
+
+test("discord ingestion readiness falls through to the next enabled ready route", () => {
+  const readiness = evaluateDiscordIngestionReadiness(
+    {
+      ...DEFAULT_DISCORD_INGESTION_SETTINGS,
+      botToken: "token",
+      routePriority: ["bot_engine", "webview", "foreground_service"],
+    },
+    {
+      botGatewayReady: false,
+      webViewSessionReady: true,
+      foregroundServiceActive: true,
+    },
+  );
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.activeRoute, "webview");
+  assert.equal(readiness.activeRouteLabel, "WebView");
+  assert.match(readiness.detailLabel, /WebView session produced alert evidence/);
+});

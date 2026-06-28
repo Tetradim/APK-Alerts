@@ -1,6 +1,7 @@
 import {
   CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
   normalizeBridgeHealthPayload,
+  normalizeLeaseEvidenceSnapshot,
   type AlertEvidenceChain,
   type ReconciliationRow,
 } from "@apk-alerts/contracts";
@@ -113,6 +114,7 @@ function buildEmptyEvidenceSnapshot(checkedAt = ""): RemoteAlertEvidenceSnapshot
   return {
     checkedAt,
     bridgeHealth: normalizeBridgeHealthPayload(null),
+    leaseEvidence: normalizeLeaseEvidenceSnapshot(null),
     signals: [],
     decisions: [],
     chains: [],

@@ -72,6 +72,13 @@ export function normalizeNativePhoneEngineRuntimeStatus(
     discordEngineEmbedded: booleanValue(data.discordEngineEmbedded, false),
     brokerEngineEmbedded: booleanValue(data.brokerEngineEmbedded, false),
     discordEngineReady: booleanValue(data.discordEngineReady, false),
+    discordGatewayConnected: booleanValue(data.discordGatewayConnected, false),
+    discordIngestionEvidenceReady: booleanValue(data.discordIngestionEvidenceReady, false),
+    discordGatewayStatus: stringValue(data.discordGatewayStatus),
+    discordLastAlertObservedAt: stringValue(data.discordLastAlertObservedAt),
+    peerAlertServerActive: booleanValue(data.peerAlertServerActive, false),
+    peerAlertServerStatus: stringValue(data.peerAlertServerStatus),
+    peerAlertServerPort: numberValue(data.peerAlertServerPort, 42117),
     brokerEngineReady: booleanValue(data.brokerEngineReady, false),
     liveExecutionArmed: booleanValue(data.liveExecutionArmed, false),
     health,
@@ -117,6 +124,10 @@ function normalizeHealth(value: unknown): PhoneEngineRuntimeHealth {
 
 function booleanValue(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function numberValue(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function stringValue(value: unknown): string {

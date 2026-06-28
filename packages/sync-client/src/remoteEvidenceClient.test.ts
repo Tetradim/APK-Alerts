@@ -41,6 +41,20 @@ const signalEvent = {
   },
 };
 
+const leaseEvent = {
+  event_id: "lease-event-1",
+  event_type: "lease.acquired.v1",
+  source_engine_id: "remote:windows-pc",
+  observed_at: "2026-06-27T17:00:00.500Z",
+  sequence: 10,
+  payload: {
+    lease_id: "lease-remote-1",
+    holder_engine_id: "remote:windows-pc",
+    expires_at: "2026-06-27T17:05:00.000Z",
+    reason: "remote owns lease",
+  },
+};
+
 const auditEvent = {
   id: "audit-1",
   category: "alert_ingestion",
@@ -87,7 +101,7 @@ test("remote evidence client fetches bus events, operator events, and bridge hea
   const fetchImpl: FetchLike = async (url, init) => {
     calls.push({ url: String(url), headers: init?.headers });
     if (String(url).endsWith("/bus/events?limit=50")) {
-      return jsonResponse({ events: [signalEvent] });
+      return jsonResponse({ events: [leaseEvent, signalEvent] });
     }
     if (String(url).endsWith("/operator/events?limit=50")) {
       return jsonResponse([auditEvent]);
@@ -112,6 +126,9 @@ test("remote evidence client fetches bus events, operator events, and bridge hea
   assert.deepEqual(calls[0]?.headers, { "X-API-Key": "secret" });
   assert.equal(result.snapshot.checkedAt, "2026-06-27T17:02:00.000Z");
   assert.equal(result.snapshot.signals.length, 1);
+  assert.equal(result.snapshot.leaseEvidence.holder, "remote");
+  assert.equal(result.snapshot.leaseEvidence.leaseId, "lease-remote-1");
+  assert.equal(result.snapshot.leaseEvidence.usable, true);
   assert.equal(result.snapshot.decisions.length, 1);
   assert.equal(result.snapshot.chains[0]?.eventId, "chrome-message-1");
 });

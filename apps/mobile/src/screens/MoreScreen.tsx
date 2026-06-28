@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
@@ -10,7 +9,6 @@ import {
   buildReplayAcceptanceEvidenceSummary,
   useLiveReadinessState,
 } from "@/state/liveReadinessState";
-import { useRemoteEngineState } from "@/state/remoteEngineState";
 
 function readinessTone(label: string): "good" | "warn" | "bad" | "neutral" {
   if (label === "Ready") {
@@ -27,32 +25,12 @@ function checklistTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
 }
 
 export function MoreScreen() {
-  const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
   const snapshot = useLiveReadinessState((state) => state.snapshot);
-  const updateConnectionDraft = useLiveReadinessState((state) => state.updateConnectionDraft);
   const checkReadiness = useLiveReadinessState((state) => state.checkReadiness);
   const summary = buildLiveReadinessSummary(snapshot);
   const liveChecklist = buildLiveArmChecklistSummary(snapshot);
   const replayEvidence = buildReplayAcceptanceEvidenceSummary(snapshot);
   const readiness = snapshot.remote.readiness;
-
-  useEffect(() => {
-    if (
-      remoteConnection.baseApiUrl !== snapshot.connection.baseApiUrl ||
-      remoteConnection.apiKey !== snapshot.connection.apiKey
-    ) {
-      updateConnectionDraft({
-        baseApiUrl: remoteConnection.baseApiUrl,
-        apiKey: remoteConnection.apiKey,
-      });
-    }
-  }, [
-    remoteConnection.baseApiUrl,
-    remoteConnection.apiKey,
-    snapshot.connection.baseApiUrl,
-    snapshot.connection.apiKey,
-    updateConnectionDraft,
-  ]);
 
   return (
     <ScreenFrame title="More" eyebrow="APK-Alerts">

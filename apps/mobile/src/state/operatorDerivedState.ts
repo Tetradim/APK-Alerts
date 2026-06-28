@@ -1,4 +1,9 @@
-import type { EngineHealthStatus } from "@apk-alerts/contracts";
+import {
+  normalizeLeaseEvidenceSnapshot,
+  type EngineHealthStatus,
+  type LeaseEvidenceSnapshot,
+  type LeaseEvidenceSnapshotInput,
+} from "@apk-alerts/contracts";
 import type { AlertEvidenceSnapshot } from "./alertEvidenceState";
 import type { LiveReadinessSnapshot } from "./liveReadinessState";
 import type { ActiveEngine, LeaseState, OperatorSnapshot, ReadinessState, SyncStatus } from "./operatorState";
@@ -13,6 +18,7 @@ export interface OperatorSnapshotEvidenceInput {
   alertEvidence: AlertEvidenceSnapshot;
   liveReadiness: LiveReadinessSnapshot;
   phoneEngine?: PhoneEngineRuntimeSnapshot;
+  leaseEvidence?: LeaseEvidenceSnapshotInput;
 }
 
 export function buildOperatorSnapshotFromEvidence(
@@ -23,13 +29,14 @@ export function buildOperatorSnapshotFromEvidence(
     : null;
   const phoneHealth = derivePhoneHealth(input.remoteEngine, input.phoneEngine, phoneRuntime?.canOwnLease ?? false);
   const remoteHealth = normalizeOperatorHealth(input.remoteEngine.remote.engineHealth);
-  const activeEngine = deriveActiveEngine(input.remoteEngine, phoneHealth, remoteHealth);
+  const leaseEvidence = deriveLeaseEvidence(input);
+  const activeEngine = deriveActiveEngine(input.remoteEngine, phoneHealth, remoteHealth, leaseEvidence);
 
   return {
     activeEngine,
     phoneHealth,
     remoteHealth,
-    leaseState: deriveLeaseState(activeEngine),
+    leaseState: deriveLeaseState(leaseEvidence),
     transport: input.remoteEngine.connection.transport,
     readiness: deriveReadiness(input.liveReadiness),
     syncStatus: deriveSyncStatus(input.alertEvidence),
@@ -41,11 +48,16 @@ function deriveActiveEngine(
   remoteEngine: RemoteEngineSnapshot,
   phoneHealth: EngineHealthStatus,
   remoteHealth: EngineHealthStatus,
+  leaseEvidence: LeaseEvidenceSnapshot,
 ): ActiveEngine {
-  if (phoneHealth === "healthy") {
+  if (!leaseEvidence.usable) {
+    return "none";
+  }
+  if (leaseEvidence.holder === "phone" && phoneHealth === "healthy") {
     return "phone";
   }
   if (
+    leaseEvidence.holder === "remote" &&
     remoteEngine.remote.checkedAt &&
     remoteHealth === "healthy" &&
     remoteEngine.remote.executionReady
@@ -69,14 +81,34 @@ function derivePhoneHealth(
   return remoteEngine.phoneEngineOnline ? "degraded" : "offline";
 }
 
-function deriveLeaseState(activeEngine: ActiveEngine): LeaseState {
-  if (activeEngine === "phone") {
+function deriveLeaseEvidence(input: OperatorSnapshotEvidenceInput): LeaseEvidenceSnapshot {
+  if (input.leaseEvidence !== undefined) {
+    return normalizeLeaseEvidenceSnapshot(input.leaseEvidence);
+  }
+
+  const hasRemoteEvidence = Boolean(
+    input.remoteEngine.remote.checkedAt ||
+      input.alertEvidence.evidence.checkedAt ||
+      input.liveReadiness.remote.checkedAt ||
+      input.phoneEngine?.lastHeartbeatAt,
+  );
+  return normalizeLeaseEvidenceSnapshot({
+    holder: hasRemoteEvidence ? "unknown" : "none",
+    source: "none",
+  });
+}
+
+function deriveLeaseState(leaseEvidence: LeaseEvidenceSnapshot): LeaseState {
+  if (!leaseEvidence.usable) {
+    return leaseEvidence.holder === "none" ? "none" : "unclear";
+  }
+  if (leaseEvidence.holder === "phone") {
     return "phone_held";
   }
-  if (activeEngine === "remote") {
+  if (leaseEvidence.holder === "remote") {
     return "remote_held";
   }
-  return "none";
+  return "unclear";
 }
 
 function deriveReadiness(liveReadiness: LiveReadinessSnapshot): ReadinessState {

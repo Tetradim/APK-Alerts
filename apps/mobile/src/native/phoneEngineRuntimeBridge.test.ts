@@ -26,6 +26,13 @@ test("native phone engine bridge normalizes healthy foreground service status", 
       discordEngineEmbedded: true,
       brokerEngineEmbedded: true,
       discordEngineReady: true,
+      discordGatewayConnected: true,
+      discordIngestionEvidenceReady: true,
+      discordGatewayStatus: "message_create",
+      discordLastAlertObservedAt: "2026-06-27T18:24:59.000Z",
+      peerAlertServerActive: true,
+      peerAlertServerStatus: "listening",
+      peerAlertServerPort: 42117,
       brokerEngineReady: true,
       liveExecutionArmed: false,
       health: "healthy",
@@ -43,6 +50,10 @@ test("native phone engine bridge normalizes healthy foreground service status", 
   assert.equal(snapshot.discordEngineEmbedded, true);
   assert.equal(snapshot.brokerEngineEmbedded, true);
   assert.equal(snapshot.discordEngineReady, true);
+  assert.equal(snapshot.discordGatewayConnected, true);
+  assert.equal(snapshot.discordIngestionEvidenceReady, true);
+  assert.equal(snapshot.peerAlertServerActive, true);
+  assert.equal(snapshot.peerAlertServerPort, 42117);
   assert.equal(snapshot.brokerEngineReady, true);
   assert.equal(snapshot.liveExecutionArmed, false);
   assert.equal(snapshot.health, "healthy");

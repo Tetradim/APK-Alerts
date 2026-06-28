@@ -3,9 +3,15 @@ import {
   normalizeLiveReadinessPayload,
   type LiveReadiness,
 } from "@apk-alerts/contracts";
-import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
+import {
+  buildRemoteEndpointClient,
+  fetchRemoteJson,
+  normalizeRemoteApiBaseUrl,
+  type FetchLike,
+} from "./remoteHttp";
 
 export type { FetchLike };
+export { normalizeRemoteApiBaseUrl as normalizeRemoteLiveReadinessBaseUrl };
 
 export interface RemoteLiveReadinessClientConfig {
   baseApiUrl: string;
@@ -27,52 +33,23 @@ export interface RemoteLiveReadinessResult {
   error: string;
 }
 
-export function normalizeRemoteLiveReadinessBaseUrl(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  try {
-    const url = new URL(trimmed);
-    url.pathname = url.pathname.replace(/\/+$/, "");
-    if (!url.pathname.endsWith("/api")) {
-      url.pathname = `${url.pathname}/api`.replace(/\/+/g, "/");
-    }
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
 export async function fetchRemoteLiveReadiness(
   config: RemoteLiveReadinessClientConfig,
 ): Promise<RemoteLiveReadinessResult> {
   const checkedAt = config.now?.() ?? new Date().toISOString();
-  const baseApiUrl = normalizeRemoteLiveReadinessBaseUrl(config.baseApiUrl);
-  if (!baseApiUrl) {
+  const endpoint = buildRemoteEndpointClient(config);
+  if (!endpoint.ok) {
     return {
       ok: false,
       snapshot: buildSnapshot(checkedAt, null),
-      error: "Remote API URL is invalid.",
-    };
-  }
-
-  const fetchImpl = config.fetchImpl ?? globalThis.fetch?.bind(globalThis);
-  if (!fetchImpl) {
-    return {
-      ok: false,
-      snapshot: buildSnapshot(checkedAt, null),
-      error: "Fetch is not available.",
+      error: endpoint.error,
     };
   }
 
   try {
-    const payload = await fetchRemoteJson(fetchImpl, `${baseApiUrl}/operator/live-readiness`, {
-      apiKey: config.apiKey,
-      timeoutMs: config.timeoutMs,
+    const payload = await fetchRemoteJson(endpoint.fetchImpl, `${endpoint.baseApiUrl}/operator/live-readiness`, {
+      apiKey: endpoint.apiKey,
+      timeoutMs: endpoint.timeoutMs,
     });
     const snapshot = buildSnapshot(checkedAt, payload);
     return {

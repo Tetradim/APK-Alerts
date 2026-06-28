@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildRemoteEngineHealthSnapshot,
   normalizeBridgeHealthPayload,
+  normalizeLeaseEvidenceSnapshot,
   normalizeLiveReadinessPayload,
   normalizeRemoteHealthPayload,
   normalizeRemoteStatusPayload,
@@ -73,6 +74,7 @@ function checkedEvidenceSnapshot(): AlertEvidenceSnapshot {
           reason: "heartbeat",
         },
       }),
+      leaseEvidence: normalizeLeaseEvidenceSnapshot(null),
       signals: [],
       decisions: [],
       chains: [],
@@ -180,6 +182,16 @@ test("derived operator snapshot reflects checked remote and evidence state", () 
     remoteEngine: checkedRemoteSnapshot(),
     alertEvidence: checkedEvidenceSnapshot(),
     liveReadiness: readyToArmSnapshot(),
+    leaseEvidence: {
+      holder: "remote",
+      leaseId: "lease-remote-1",
+      holderEngineId: "remote",
+      expiresAt: "2026-06-27T18:15:00.000Z",
+      observedAt: "2026-06-27T18:10:01.000Z",
+      stale: false,
+      conflict: false,
+      source: "remote_event_log",
+    },
   });
   const summary = buildCockpitSummary(snapshot);
 
@@ -201,6 +213,16 @@ test("derived operator snapshot lets healthy phone runtime own the lease before 
     nativeRuntimeAvailable: true,
     serviceEnabled: true,
     foregroundServiceActive: true,
+    discordEngineEmbedded: true,
+    brokerEngineEmbedded: true,
+    discordEngineReady: true,
+    discordGatewayConnected: true,
+    discordIngestionEvidenceReady: true,
+    discordGatewayStatus: "message_create",
+    discordLastAlertObservedAt: "2026-06-27T18:19:59.000Z",
+    peerAlertServerActive: true,
+    peerAlertServerStatus: "listening",
+    brokerEngineReady: true,
     health: "healthy",
     lastHeartbeatAt: "2026-06-27T18:20:00.000Z",
     blockingReason: "",
@@ -210,9 +232,85 @@ test("derived operator snapshot lets healthy phone runtime own the lease before 
     alertEvidence: checkedEvidenceSnapshot(),
     liveReadiness: readyToArmSnapshot(),
     phoneEngine,
+    leaseEvidence: {
+      holder: "phone",
+      leaseId: "lease-phone-1",
+      holderEngineId: "phone",
+      expiresAt: "2026-06-27T18:25:00.000Z",
+      observedAt: "2026-06-27T18:20:00.000Z",
+      stale: false,
+      conflict: false,
+      source: "phone_native_store",
+    },
   });
 
   assert.equal(snapshot.activeEngine, "phone");
   assert.equal(snapshot.phoneHealth, "healthy");
   assert.equal(snapshot.leaseState, "phone_held");
+});
+
+test("derived operator snapshot does not synthesize lease ownership from engine health", () => {
+  const snapshot = buildOperatorSnapshotFromEvidence({
+    remoteEngine: checkedRemoteSnapshot(),
+    alertEvidence: checkedEvidenceSnapshot(),
+    liveReadiness: readyToArmSnapshot(),
+    leaseEvidence: {
+      holder: "unknown",
+      leaseId: null,
+      holderEngineId: null,
+      expiresAt: null,
+      observedAt: null,
+      stale: false,
+      conflict: false,
+      source: "none",
+    },
+  });
+  const summary = buildCockpitSummary(snapshot);
+
+  assert.equal(snapshot.activeEngine, "none");
+  assert.equal(snapshot.leaseState, "unclear");
+  assert.equal(summary.canExecute, false);
+  assert.equal(summary.leaseLabel, "Lease unclear");
+});
+
+test("derived operator snapshot keeps phone standby when remote owns the audited lease", () => {
+  const phoneEngine: PhoneEngineRuntimeSnapshot = {
+    ...getDefaultPhoneEngineRuntimeSnapshot(),
+    nativeRuntimeAvailable: true,
+    serviceEnabled: true,
+    foregroundServiceActive: true,
+    discordEngineEmbedded: true,
+    brokerEngineEmbedded: true,
+    discordEngineReady: true,
+    discordGatewayConnected: true,
+    discordIngestionEvidenceReady: true,
+    discordGatewayStatus: "message_create",
+    discordLastAlertObservedAt: "2026-06-27T18:19:59.000Z",
+    peerAlertServerActive: true,
+    peerAlertServerStatus: "listening",
+    brokerEngineReady: true,
+    health: "healthy",
+    lastHeartbeatAt: "2026-06-27T18:20:00.000Z",
+    blockingReason: "",
+  };
+  const snapshot = buildOperatorSnapshotFromEvidence({
+    remoteEngine: checkedRemoteSnapshot(),
+    alertEvidence: checkedEvidenceSnapshot(),
+    liveReadiness: readyToArmSnapshot(),
+    phoneEngine,
+    leaseEvidence: {
+      holder: "remote",
+      leaseId: "lease-remote-1",
+      holderEngineId: "remote",
+      expiresAt: "2026-06-27T18:25:00.000Z",
+      observedAt: "2026-06-27T18:20:00.000Z",
+      stale: false,
+      conflict: false,
+      source: "remote_event_log",
+    },
+  });
+
+  assert.equal(snapshot.activeEngine, "remote");
+  assert.equal(snapshot.phoneHealth, "healthy");
+  assert.equal(snapshot.leaseState, "remote_held");
 });

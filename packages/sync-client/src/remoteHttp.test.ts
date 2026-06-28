@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchRemoteJson, type FetchLike } from "./remoteHttp.js";
+import {
+  buildRemoteEndpointClient,
+  fetchRemoteJson,
+  normalizeRemoteApiBaseUrl,
+  type FetchLike,
+} from "./remoteHttp.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -44,4 +49,24 @@ test("remote JSON fetch fails with deterministic timeout error", async () => {
       }),
     /Timed out after 1ms/,
   );
+});
+
+test("remote endpoint client normalizes API base URLs and fails closed", () => {
+  const client = buildRemoteEndpointClient({
+    baseApiUrl: "http://100.90.10.11:8001//",
+    apiKey: " secret ",
+    fetchImpl: async () => jsonResponse({ ok: true }),
+    timeoutMs: 5_000,
+  });
+  const invalidClient = buildRemoteEndpointClient({
+    baseApiUrl: "not a url",
+  });
+
+  assert.equal(normalizeRemoteApiBaseUrl("http://100.90.10.11:8001/api/"), "http://100.90.10.11:8001/api");
+  assert.equal(client.ok, true);
+  assert.equal(client.baseApiUrl, "http://100.90.10.11:8001/api");
+  assert.equal(client.apiKey, "secret");
+  assert.equal(client.timeoutMs, 5_000);
+  assert.equal(invalidClient.ok, false);
+  assert.equal(invalidClient.error, "Remote API URL is invalid.");
 });

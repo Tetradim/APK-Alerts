@@ -12,6 +12,7 @@ import {
   installPersistentMobileState,
 } from "@/state/persistentMobileState";
 import { phoneEngineRuntimeStore } from "@/state/phoneEngineRuntimeState";
+import { installRemoteConnectionSync } from "@/state/remoteConnectionSync";
 import { useSettingsState } from "@/state/settingsState";
 
 export default function RootLayout() {
@@ -20,6 +21,7 @@ export default function RootLayout() {
     let phoneRuntimeInterval: ReturnType<typeof setInterval> | undefined;
     let unsubscribe: (() => void) | undefined;
     let unsubscribeNativeDiscordSettings: (() => void) | undefined;
+    let unsubscribeRemoteConnectionSync: (() => void) | undefined;
 
     const refreshPhoneRuntime = async () => {
       const snapshot = await readNativePhoneEngineRuntime();
@@ -40,6 +42,7 @@ export default function RootLayout() {
           return;
         }
         unsubscribe = installPersistentMobileState(expoSecureSettingsStorage);
+        unsubscribeRemoteConnectionSync = installRemoteConnectionSync();
         const syncNativeDiscordSettings = () =>
           applyNativeDiscordIngestionSettings(
             phoneEngineRuntimeStore,
@@ -62,6 +65,7 @@ export default function RootLayout() {
       }
       unsubscribe?.();
       unsubscribeNativeDiscordSettings?.();
+      unsubscribeRemoteConnectionSync?.();
     };
   }, []);
 

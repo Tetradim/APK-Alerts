@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { buildActionButtonAccessibility } from "@/components/actionButtonAccessibility";
 import { MetricTile } from "@/components/MetricTile";
@@ -18,7 +17,6 @@ import {
   usePeerAlertFailsafeState,
 } from "@/state/peerAlertFailsafeState";
 import { useReconciliationState } from "@/state/reconciliationState";
-import { useRemoteEngineState } from "@/state/remoteEngineState";
 
 function healthTone(label: string): "good" | "warn" | "bad" | "neutral" {
   if (label === "Healthy") {
@@ -65,46 +63,13 @@ function peerChallengeTone(blocking: boolean): "good" | "warn" | "bad" | "neutra
 }
 
 export function AlertsScreen() {
-  const remoteConnection = useRemoteEngineState((state) => state.snapshot.connection);
   const snapshot = useAlertEvidenceState((state) => state.snapshot);
-  const updateConnectionDraft = useAlertEvidenceState((state) => state.updateConnectionDraft);
   const refreshEvidence = useAlertEvidenceState((state) => state.refreshEvidence);
   const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
-  const updateReconciliationConnectionDraft = useReconciliationState((state) => state.updateConnectionDraft);
   const peerAlertSnapshot = usePeerAlertFailsafeState((state) => state.snapshot);
   const summary = buildAlertEvidenceSummary(snapshot);
   const supervisor = buildBridgeSupervisorSummary(snapshot);
   const peerAlert = buildPeerAlertOutcomeSummary(peerAlertSnapshot);
-
-  useEffect(() => {
-    if (
-      remoteConnection.baseApiUrl !== snapshot.connection.baseApiUrl ||
-      remoteConnection.apiKey !== snapshot.connection.apiKey
-    ) {
-      updateConnectionDraft({
-        baseApiUrl: remoteConnection.baseApiUrl,
-        apiKey: remoteConnection.apiKey,
-      });
-    }
-    if (
-      remoteConnection.baseApiUrl !== reconciliationSnapshot.connection.baseApiUrl ||
-      remoteConnection.apiKey !== reconciliationSnapshot.connection.apiKey
-    ) {
-      updateReconciliationConnectionDraft({
-        baseApiUrl: remoteConnection.baseApiUrl,
-        apiKey: remoteConnection.apiKey,
-      });
-    }
-  }, [
-    remoteConnection.baseApiUrl,
-    remoteConnection.apiKey,
-    snapshot.connection.baseApiUrl,
-    snapshot.connection.apiKey,
-    reconciliationSnapshot.connection.baseApiUrl,
-    reconciliationSnapshot.connection.apiKey,
-    updateConnectionDraft,
-    updateReconciliationConnectionDraft,
-  ]);
 
   return (
     <ScreenFrame title="Alerts" eyebrow="APK-Alerts">

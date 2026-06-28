@@ -2,8 +2,6 @@ import type { DiscordIngestionSettings } from "@apk-alerts/contracts";
 import type { StoreApi } from "zustand/vanilla";
 import {
   configureNativeDiscordIngestion,
-  startNativePhoneEngineRuntime,
-  stopNativePhoneEngineRuntime,
   type PhoneEngineRuntimeNativeModule,
 } from "../native/phoneEngineRuntimeBridge";
 import {
@@ -22,10 +20,5 @@ export async function applyNativeDiscordIngestionSettings(
   const configured = await configureNativeDiscordIngestion(nativeModule, settings);
   store.getState().updateRuntime(configured);
 
-  const nextSnapshot = settings.foregroundServiceEnabled
-    ? await startNativePhoneEngineRuntime(nativeModule)
-    : await stopNativePhoneEngineRuntime(nativeModule);
-  store.getState().updateRuntime(nextSnapshot);
-
-  return nextSnapshot;
+  return configured;
 }

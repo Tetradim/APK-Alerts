@@ -140,7 +140,13 @@ export function EnginesScreen() {
           <StatusPill label={phoneRuntime.leaseLabel} tone={phoneRuntimeTone(phoneRuntime.blocking)} />
         </View>
         <Text style={styles.detail}>
-          Discord adapter {adapterLabel(phoneRuntimeSnapshot.discordEngineEmbedded, phoneRuntimeSnapshot.discordEngineReady)}
+          Discord gateway {phoneRuntimeSnapshot.discordGatewayConnected ? "connected" : phoneRuntimeSnapshot.discordGatewayStatus || "not connected"}
+        </Text>
+        <Text style={styles.detail}>
+          Discord ingestion evidence {phoneRuntimeSnapshot.discordIngestionEvidenceReady ? `ready ${phoneRuntimeSnapshot.discordLastAlertObservedAt}` : "waiting for allowed alert"}
+        </Text>
+        <Text style={styles.detail}>
+          Peer challenge listener {phoneRuntimeSnapshot.peerAlertServerActive ? `listening on ${phoneRuntimeSnapshot.peerAlertServerPort}` : phoneRuntimeSnapshot.peerAlertServerStatus || "not started"}
         </Text>
         <Text style={styles.detail}>
           Broker adapter {adapterLabel(phoneRuntimeSnapshot.brokerEngineEmbedded, phoneRuntimeSnapshot.brokerEngineReady)}

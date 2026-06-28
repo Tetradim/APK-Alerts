@@ -7,6 +7,7 @@ import {
   normalizeBridgeAlertDecisionEvent,
   normalizeBridgeHealthPayload,
   normalizeBridgeSignalEvent,
+  normalizeLeaseEvidenceSnapshot,
 } from "@apk-alerts/contracts";
 import {
   buildAlertReconciliationTraceSummary,
@@ -96,6 +97,7 @@ function evidenceSnapshot(overrides = {}) {
       issues: [],
       last_heartbeat: { bridge_enabled: true, channel_id: "chrome-alerts" },
     }),
+    leaseEvidence: normalizeLeaseEvidenceSnapshot(null),
     signals: [signal],
     decisions: [acceptedDecision],
     chains,

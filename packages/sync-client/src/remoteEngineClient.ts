@@ -4,9 +4,15 @@ import {
   normalizeRemoteStatusPayload,
   type RemoteEngineHealthSnapshot,
 } from "@apk-alerts/contracts";
-import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
+import {
+  buildRemoteEndpointClient,
+  fetchRemoteJson,
+  normalizeRemoteApiBaseUrl,
+  type FetchLike,
+} from "./remoteHttp";
 
 export type { FetchLike };
+export { normalizeRemoteApiBaseUrl };
 
 export interface RemoteEngineClientConfig {
   baseApiUrl: string;
@@ -22,26 +28,6 @@ export interface RemoteEngineCheckResult {
   error: string;
 }
 
-export function normalizeRemoteApiBaseUrl(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  try {
-    const url = new URL(trimmed);
-    url.pathname = url.pathname.replace(/\/+$/, "");
-    if (!url.pathname.endsWith("/api")) {
-      url.pathname = `${url.pathname}/api`.replace(/\/+/g, "/");
-    }
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
 function buildOfflineSnapshot(checkedAt: string): RemoteEngineHealthSnapshot {
   return buildRemoteEngineHealthSnapshot({
     health: normalizeRemoteHealthPayload(null),
@@ -54,33 +40,24 @@ export async function checkRemoteEngineHealth(
   config: RemoteEngineClientConfig,
 ): Promise<RemoteEngineCheckResult> {
   const checkedAt = config.now?.() ?? new Date().toISOString();
-  const baseApiUrl = normalizeRemoteApiBaseUrl(config.baseApiUrl);
-  if (!baseApiUrl) {
+  const endpoint = buildRemoteEndpointClient(config);
+  if (!endpoint.ok) {
     return {
       ok: false,
       snapshot: buildOfflineSnapshot(checkedAt),
-      error: "Remote API URL is invalid.",
-    };
-  }
-
-  const fetchImpl = config.fetchImpl ?? globalThis.fetch?.bind(globalThis);
-  if (!fetchImpl) {
-    return {
-      ok: false,
-      snapshot: buildOfflineSnapshot(checkedAt),
-      error: "Fetch is not available.",
+      error: endpoint.error,
     };
   }
 
   try {
     const [healthPayload, statusPayload] = await Promise.all([
-      fetchRemoteJson(fetchImpl, `${baseApiUrl}/health`, {
-        apiKey: config.apiKey,
-        timeoutMs: config.timeoutMs,
+      fetchRemoteJson(endpoint.fetchImpl, `${endpoint.baseApiUrl}/health`, {
+        apiKey: endpoint.apiKey,
+        timeoutMs: endpoint.timeoutMs,
       }),
-      fetchRemoteJson(fetchImpl, `${baseApiUrl}/status`, {
-        apiKey: config.apiKey,
-        timeoutMs: config.timeoutMs,
+      fetchRemoteJson(endpoint.fetchImpl, `${endpoint.baseApiUrl}/status`, {
+        apiKey: endpoint.apiKey,
+        timeoutMs: endpoint.timeoutMs,
       }),
     ]);
     const snapshot = buildRemoteEngineHealthSnapshot({

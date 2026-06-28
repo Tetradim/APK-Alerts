@@ -5,9 +5,15 @@ import {
   type AlertPeerFailsafeOptions,
   type AlertPeerResponseEvent,
 } from "@apk-alerts/contracts";
-import { fetchRemoteJson, type FetchLike } from "./remoteHttp";
+import {
+  buildRemoteEndpointClient,
+  fetchRemoteJson,
+  normalizeRemoteApiBaseUrl,
+  type FetchLike,
+} from "./remoteHttp";
 
 export type { FetchLike };
+export { normalizeRemoteApiBaseUrl as normalizePeerAlertFailsafeBaseUrl };
 
 export interface PeerAlertFailsafeClientConfig {
   baseApiUrl: string;
@@ -26,26 +32,6 @@ export interface PeerAlertFailsafeResult {
   error: string;
 }
 
-export function normalizePeerAlertFailsafeBaseUrl(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  try {
-    const url = new URL(trimmed);
-    url.pathname = url.pathname.replace(/\/+$/, "");
-    if (!url.pathname.endsWith("/api")) {
-      url.pathname = `${url.pathname}/api`.replace(/\/+/g, "/");
-    }
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
 export async function requestPhoneAlertPeerResponse(
   config: PeerAlertFailsafeClientConfig,
   challenge: AlertPeerChallengeEvent,
@@ -54,22 +40,17 @@ export async function requestPhoneAlertPeerResponse(
   const evaluationOptions = buildEvaluationOptions(config.maxAlertSkewMs);
   const missingEvaluation = () =>
     evaluateAlertPeerResponse(challenge, null, evaluationOptions);
-  const baseApiUrl = normalizePeerAlertFailsafeBaseUrl(config.baseApiUrl);
-  if (!baseApiUrl) {
-    return failClosed(checkedAt, missingEvaluation(), "Remote API URL is invalid.");
-  }
-
-  const fetchImpl = config.fetchImpl ?? globalThis.fetch?.bind(globalThis);
-  if (!fetchImpl) {
-    return failClosed(checkedAt, missingEvaluation(), "Fetch is not available.");
+  const endpoint = buildRemoteEndpointClient(config);
+  if (!endpoint.ok) {
+    return failClosed(checkedAt, missingEvaluation(), endpoint.error);
   }
 
   try {
-    const payload = await fetchRemoteJson(fetchImpl, `${baseApiUrl}/peer-alert/challenges`, {
-      apiKey: config.apiKey,
+    const payload = await fetchRemoteJson(endpoint.fetchImpl, `${endpoint.baseApiUrl}/peer-alert/challenges`, {
+      apiKey: endpoint.apiKey,
       body: challenge,
       method: "POST",
-      timeoutMs: config.timeoutMs,
+      timeoutMs: endpoint.timeoutMs,
     });
     const response = extractPeerAlertResponseEvent(payload);
     if (!response) {

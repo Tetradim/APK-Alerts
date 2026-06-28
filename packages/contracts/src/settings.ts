@@ -202,6 +202,7 @@ export function evaluateDiscordIngestionReadiness(
   evidence: DiscordIngestionReadinessEvidence = {},
 ): DiscordIngestionReadiness {
   const normalized = normalizeDiscordIngestionSettings(settings);
+  let firstBlockedRoute: DiscordIngestionReadiness | null = null;
   for (const route of normalized.routePriority) {
     if (!discordRouteEnabled(route, normalized)) {
       continue;
@@ -217,7 +218,7 @@ export function evaluateDiscordIngestionReadiness(
       };
     }
 
-    return {
+    firstBlockedRoute ??= {
       ready: false,
       activeRoute: route,
       activeRouteLabel: discordRouteLabel(route),
@@ -225,7 +226,7 @@ export function evaluateDiscordIngestionReadiness(
     };
   }
 
-  return {
+  return firstBlockedRoute ?? {
     ready: false,
     activeRoute: null,
     activeRouteLabel: "No route",

@@ -5,6 +5,7 @@ import {
   buildIdempotencyKey,
   canEngineExecute,
   createEvent,
+  normalizeLeaseEvidenceSnapshot,
   reduceLeaseEvent,
   type TradingEventType,
 } from "./index.js";
@@ -205,6 +206,40 @@ test("lease expired clears execution authority", () => {
   assert.equal(expired.expiresAtMs, null);
   assert.equal(expired.lastEventId, "event-expired");
   assert.equal(canEngineExecute(expired, "phone:pixel-1", Date.parse("2026-06-27T05:04:00.000Z")), false);
+});
+
+test("lease evidence normalizes active holder and fail-closed states", () => {
+  const active = normalizeLeaseEvidenceSnapshot({
+    holder: "phone",
+    leaseId: " lease-1 ",
+    holderEngineId: " phone:pixel-1 ",
+    expiresAt: "2026-06-27T05:05:00.000Z",
+    observedAt: "2026-06-27T05:00:00.000Z",
+    stale: false,
+    conflict: false,
+    source: "phone_native_store",
+  });
+  const missing = normalizeLeaseEvidenceSnapshot(null);
+  const conflict = normalizeLeaseEvidenceSnapshot({
+    holder: "remote",
+    leaseId: "lease-2",
+    holderEngineId: "remote:windows-pc",
+    expiresAt: "2026-06-27T05:05:00.000Z",
+    observedAt: "2026-06-27T05:00:00.000Z",
+    stale: false,
+    conflict: true,
+    source: "remote_event_log",
+  });
+
+  assert.equal(active.holder, "phone");
+  assert.equal(active.leaseId, "lease-1");
+  assert.equal(active.holderEngineId, "phone:pixel-1");
+  assert.equal(active.usable, true);
+  assert.equal(missing.holder, "unknown");
+  assert.equal(missing.usable, false);
+  assert.equal(conflict.holder, "unknown");
+  assert.equal(conflict.usable, false);
+  assert.equal(conflict.reason, "Lease conflict detected.");
 });
 
 test("idempotency keys normalize duplicate order intent identity", () => {

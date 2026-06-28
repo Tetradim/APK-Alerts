@@ -2,11 +2,94 @@ export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promis
 
 export const DEFAULT_REMOTE_FETCH_TIMEOUT_MS = 8_000;
 
+export interface RemoteEndpointClientConfig {
+  baseApiUrl: string;
+  apiKey?: string | undefined;
+  fetchImpl?: FetchLike | undefined;
+  timeoutMs?: number | undefined;
+}
+
+export type RemoteEndpointClient =
+  | {
+      ok: true;
+      baseApiUrl: string;
+      apiKey: string | undefined;
+      fetchImpl: FetchLike;
+      timeoutMs: number | undefined;
+      error: "";
+    }
+  | {
+      ok: false;
+      baseApiUrl: "";
+      apiKey: string | undefined;
+      fetchImpl: null;
+      timeoutMs: number | undefined;
+      error: string;
+    };
+
 export interface RemoteJsonOptions {
   apiKey?: string | undefined;
   timeoutMs?: number | undefined;
   method?: "GET" | "POST" | undefined;
   body?: unknown | undefined;
+}
+
+export function normalizeRemoteApiBaseUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.pathname = url.pathname.replace(/\/+$/, "");
+    if (!url.pathname.endsWith("/api")) {
+      url.pathname = `${url.pathname}/api`.replace(/\/+/g, "/");
+    }
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+export function buildRemoteEndpointClient(
+  config: RemoteEndpointClientConfig,
+): RemoteEndpointClient {
+  const baseApiUrl = normalizeRemoteApiBaseUrl(config.baseApiUrl);
+  const apiKey = normalizeApiKey(config.apiKey);
+  if (!baseApiUrl) {
+    return {
+      ok: false,
+      baseApiUrl: "",
+      apiKey,
+      fetchImpl: null,
+      timeoutMs: config.timeoutMs,
+      error: "Remote API URL is invalid.",
+    };
+  }
+
+  const fetchImpl = config.fetchImpl ?? globalThis.fetch?.bind(globalThis);
+  if (!fetchImpl) {
+    return {
+      ok: false,
+      baseApiUrl: "",
+      apiKey,
+      fetchImpl: null,
+      timeoutMs: config.timeoutMs,
+      error: "Fetch is not available.",
+    };
+  }
+
+  return {
+    ok: true,
+    baseApiUrl,
+    apiKey,
+    fetchImpl,
+    timeoutMs: config.timeoutMs,
+    error: "",
+  };
 }
 
 export async function fetchRemoteJson(
@@ -62,6 +145,11 @@ function buildHeaders(apiKey: string | undefined, hasJsonBody: boolean): Headers
     headers["X-API-Key"] = trimmed;
   }
   return headers;
+}
+
+function normalizeApiKey(apiKey: string | undefined): string | undefined {
+  const trimmed = apiKey?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function isAbortError(error: unknown): boolean {

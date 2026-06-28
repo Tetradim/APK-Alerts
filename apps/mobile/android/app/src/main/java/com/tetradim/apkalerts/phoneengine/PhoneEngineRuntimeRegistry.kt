@@ -3,6 +3,8 @@ package com.tetradim.apkalerts.phoneengine
 import android.content.Context
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableMap
+import org.json.JSONObject
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -38,9 +40,19 @@ object PhoneEngineRuntimeRegistry {
   private var discordEngineReady = false
   private var brokerEngineReady = false
   private var liveExecutionArmed = false
-  private var discordGatewayReady = false
+  private var discordGatewayConnected = false
+  private var discordIngestionEvidenceReady = false
   private var discordGatewayStatus = "not_started"
-  private var discordLastGatewayEventAt = ""
+  private var discordLastAlertObservedAt = ""
+  private var discordLastAlertReceivedAt = ""
+  private var discordLastAlertMessageId = ""
+  private var discordLastAlertGuildId = ""
+  private var discordLastAlertChannelId = ""
+  private var discordLastAlertAuthorId = ""
+  private var discordLastAlertMessageUrl = ""
+  private var discordLastAlertTextSha256 = ""
+  private var peerAlertServerActive = false
+  private var peerAlertServerStatus = "not_started"
   private var health = "offline"
   private var lastHeartbeatAt = ""
   private var blockingReason = "Foreground service stopped."
@@ -138,13 +150,68 @@ object PhoneEngineRuntimeRegistry {
   }
 
   @Synchronized
-  fun markDiscordGatewayState(context: Context, ready: Boolean, status: String, hasEvent: Boolean = false) {
-    discordGatewayReady = ready
+  fun markDiscordGatewayState(context: Context, connected: Boolean, status: String, hasEvent: Boolean = false) {
+    discordGatewayConnected = connected
     discordGatewayStatus = status
     if (hasEvent) {
-      discordLastGatewayEventAt = nowIso()
+      discordIngestionEvidenceReady = true
+      discordLastAlertObservedAt = nowIso()
     }
     refreshAdapterState(context)
+  }
+
+  @Synchronized
+  fun markDiscordAlertObserved(context: Context, message: JSONObject) {
+    val observedAt = nowIso()
+    val guildId = message.optString("guild_id")
+    val channelId = message.optString("channel_id")
+    val messageId = message.optString("id")
+    val authorId = message.optJSONObject("author")?.optString("id").orEmpty()
+    val content = message.optString("content")
+
+    discordGatewayConnected = true
+    discordIngestionEvidenceReady = true
+    discordGatewayStatus = "message_create"
+    discordLastAlertObservedAt = observedAt
+    discordLastAlertReceivedAt = observedAt
+    discordLastAlertGuildId = guildId
+    discordLastAlertChannelId = channelId
+    discordLastAlertMessageId = messageId
+    discordLastAlertAuthorId = authorId
+    discordLastAlertMessageUrl = discordMessageUrl(guildId, channelId, messageId)
+    discordLastAlertTextSha256 = sha256(normalizeAlertText(content))
+    refreshAdapterState(context)
+  }
+
+  @Synchronized
+  fun markPeerAlertServerState(context: Context, active: Boolean, status: String) {
+    peerAlertServerActive = active
+    peerAlertServerStatus = status
+    refreshAdapterState(context)
+  }
+
+  @Synchronized
+  fun lastAlertSnapshotJson(): JSONObject? {
+    if (discordLastAlertMessageId.isBlank() || discordLastAlertChannelId.isBlank()) {
+      return null
+    }
+
+    val fingerprint = JSONObject()
+      .put("eventId", "phone-discord:${discordLastAlertMessageId}")
+      .put("discordMessageId", discordLastAlertMessageId)
+      .put("channelId", discordLastAlertChannelId)
+      .put("authorId", discordLastAlertAuthorId.ifBlank { JSONObject.NULL })
+      .put("messageUrl", discordLastAlertMessageUrl)
+      .put("normalizedTextSha256", discordLastAlertTextSha256)
+      .put("sourceKey", discordLastAlertChannelId)
+      .put("parserConfidence", "none")
+      .put("decisionStatus", "unknown")
+      .put("queuedAlertId", "")
+
+    return JSONObject()
+      .put("observedAt", discordLastAlertObservedAt)
+      .put("receivedAt", discordLastAlertReceivedAt)
+      .put("fingerprint", fingerprint)
   }
 
   @Synchronized
@@ -182,6 +249,13 @@ object PhoneEngineRuntimeRegistry {
       putBoolean("discordEngineEmbedded", discordEngineEmbedded)
       putBoolean("brokerEngineEmbedded", brokerEngineEmbedded)
       putBoolean("discordEngineReady", discordEngineReady)
+      putBoolean("discordGatewayConnected", discordGatewayConnected)
+      putBoolean("discordIngestionEvidenceReady", discordIngestionEvidenceReady)
+      putString("discordGatewayStatus", discordGatewayStatus)
+      putString("discordLastAlertObservedAt", discordLastAlertObservedAt)
+      putBoolean("peerAlertServerActive", peerAlertServerActive)
+      putString("peerAlertServerStatus", peerAlertServerStatus)
+      putInt("peerAlertServerPort", PeerAlertChallengeServer.PORT)
       putBoolean("brokerEngineReady", brokerEngineReady)
       putBoolean("liveExecutionArmed", liveExecutionArmed)
       putString("health", health)
@@ -225,7 +299,7 @@ object PhoneEngineRuntimeRegistry {
       ROUTE_BOT_ENGINE -> {
         val botEnabled = preferences.getBoolean(KEY_DISCORD_BOT_ENABLED, true)
         val botTokenPresent = preferences.getString(KEY_DISCORD_BOT_TOKEN, "")?.trim()?.isNotEmpty() == true
-        botEnabled && botTokenPresent && discordGatewayReady
+        botEnabled && botTokenPresent && discordGatewayConnected && discordIngestionEvidenceReady
       }
       ROUTE_WEBVIEW -> false
       ROUTE_FOREGROUND_SERVICE -> false
@@ -238,6 +312,22 @@ object PhoneEngineRuntimeRegistry {
 
   private fun nowIso(): String = synchronized(isoFormatter) {
     isoFormatter.format(Date())
+  }
+
+  private fun discordMessageUrl(guildId: String, channelId: String, messageId: String): String {
+    if (channelId.isBlank() || messageId.isBlank()) {
+      return ""
+    }
+    val server = guildId.ifBlank { "@me" }
+    return "https://discord.com/channels/$server/$channelId/$messageId"
+  }
+
+  private fun normalizeAlertText(value: String): String =
+    value.trim().lowercase(Locale.US).replace(Regex("\\s+"), " ")
+
+  private fun sha256(value: String): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+    return digest.joinToString("") { byte -> "%02x".format(byte) }
   }
 
   private fun csvSet(value: String): Set<String> =

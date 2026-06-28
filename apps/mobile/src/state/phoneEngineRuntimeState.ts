@@ -11,6 +11,13 @@ export interface PhoneEngineRuntimeSnapshot {
   discordEngineEmbedded: boolean;
   brokerEngineEmbedded: boolean;
   discordEngineReady: boolean;
+  discordGatewayConnected: boolean;
+  discordIngestionEvidenceReady: boolean;
+  discordGatewayStatus: string;
+  discordLastAlertObservedAt: string;
+  peerAlertServerActive: boolean;
+  peerAlertServerStatus: string;
+  peerAlertServerPort: number;
   brokerEngineReady: boolean;
   liveExecutionArmed: boolean;
   health: PhoneEngineRuntimeHealth;
@@ -40,6 +47,13 @@ export function getDefaultPhoneEngineRuntimeSnapshot(): PhoneEngineRuntimeSnapsh
     discordEngineEmbedded: false,
     brokerEngineEmbedded: false,
     discordEngineReady: false,
+    discordGatewayConnected: false,
+    discordIngestionEvidenceReady: false,
+    discordGatewayStatus: "not_started",
+    discordLastAlertObservedAt: "",
+    peerAlertServerActive: false,
+    peerAlertServerStatus: "not_started",
+    peerAlertServerPort: 42117,
     brokerEngineReady: false,
     liveExecutionArmed: false,
     health: "unknown",
@@ -57,7 +71,8 @@ export function buildPhoneEngineRuntimeSummary(
     snapshot.foregroundServiceActive &&
     snapshot.discordEngineEmbedded &&
     snapshot.brokerEngineEmbedded &&
-    snapshot.discordEngineReady &&
+    snapshot.discordIngestionEvidenceReady &&
+    snapshot.peerAlertServerActive &&
     snapshot.brokerEngineReady &&
     snapshot.health === "healthy" &&
     Boolean(snapshot.lastHeartbeatAt);
@@ -137,11 +152,17 @@ function formatPhoneRuntimeDetail(snapshot: PhoneEngineRuntimeSnapshot, canOwnLe
   if (!snapshot.discordEngineEmbedded || !snapshot.brokerEngineEmbedded) {
     return "Native Discord and broker adapters are not embedded.";
   }
-  if (!snapshot.discordEngineReady && !snapshot.brokerEngineReady) {
+  if (!snapshot.discordIngestionEvidenceReady && !snapshot.brokerEngineReady) {
     return "Native Discord and broker adapters are not ready.";
   }
-  if (!snapshot.discordEngineReady) {
-    return "Native Discord adapter is not ready.";
+  if (!snapshot.discordGatewayConnected) {
+    return `Native Discord gateway is ${snapshot.discordGatewayStatus || "not connected"}.`;
+  }
+  if (!snapshot.discordIngestionEvidenceReady) {
+    return "Native Discord adapter has not produced allowed alert evidence.";
+  }
+  if (!snapshot.peerAlertServerActive) {
+    return `Peer challenge listener is ${snapshot.peerAlertServerStatus || "not listening"}.`;
   }
   if (!snapshot.brokerEngineReady) {
     return "Native broker adapter is not ready.";
