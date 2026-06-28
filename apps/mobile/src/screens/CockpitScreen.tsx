@@ -9,11 +9,19 @@ import {
   buildEngineCommunicationProofSummary,
 } from "@/state/operatorState";
 import { useAlertEvidenceState } from "@/state/alertEvidenceState";
+import { useDiscordWebViewHealthState } from "@/state/discordWebViewState";
+import { buildFirstRunSetupWizardSummary } from "@/state/firstRunSetupWizardState";
 import { useLiveReadinessState } from "@/state/liveReadinessState";
 import { buildOperatorSnapshotFromEvidence } from "@/state/operatorDerivedState";
+import { usePairingDoctorState } from "@/state/pairingDoctorState";
 import { usePhoneEngineRuntimeState } from "@/state/phoneEngineRuntimeState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
+import {
+  buildSetupAutomationSummary,
+  useSetupAutomationState,
+} from "@/state/setupAutomationState";
 import { useSettingsState } from "@/state/settingsState";
+import { buildMobileTailscaleSetupAction } from "@/state/tailscaleSetupState";
 
 function communicationTone(blocking: boolean): "good" | "warn" | "bad" | "neutral" {
   return blocking ? "bad" : "good";
@@ -25,6 +33,9 @@ export function CockpitScreen() {
   const alertEvidence = useAlertEvidenceState((state) => state.snapshot);
   const liveReadiness = useLiveReadinessState((state) => state.snapshot);
   const phoneEngine = usePhoneEngineRuntimeState((state) => state.snapshot);
+  const pairing = usePairingDoctorState((state) => state.snapshot);
+  const webView = useDiscordWebViewHealthState((state) => state.snapshot);
+  const setupAutomation = useSetupAutomationState((state) => state.snapshot);
   const snapshot = buildOperatorSnapshotFromEvidence({
     remoteEngine,
     alertEvidence,
@@ -35,6 +46,23 @@ export function CockpitScreen() {
   const failoverSettings = useSettingsState((state) => state.snapshot.failoverSettings);
   const summary = buildCockpitSummary(snapshot, failoverSettings);
   const communicationProof = buildEngineCommunicationProofSummary(snapshot);
+  const setupAssistant = buildSetupAutomationSummary({
+    remote: remoteEngine,
+    pairing,
+    phoneRuntime: phoneEngine,
+    webView,
+    liveReadiness,
+    windows: setupAutomation.windows,
+  });
+  const tailscaleAction = buildMobileTailscaleSetupAction({
+    windows: setupAutomation.windows,
+    remote: remoteEngine,
+    pairing,
+  });
+  const setupWizard = buildFirstRunSetupWizardSummary({
+    setup: setupAssistant,
+    tailscale: tailscaleAction,
+  });
 
   return (
     <ScreenFrame title="Operator Cockpit" eyebrow="APK-Alerts">
@@ -49,6 +77,29 @@ export function CockpitScreen() {
       <View style={styles.tileRow}>
         <MetricTile label="Remote" value={summary.remoteLabel} detail="Dormant only when phone owns lease" />
         <MetricTile label="Transport" value={summary.transportLabel} detail={summary.syncLabel} />
+      </View>
+
+      <View style={styles.policyPanel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.panelCopy}>
+            <Text style={styles.policyLabel}>First-run setup</Text>
+            <Text style={styles.policyValue}>{setupWizard.titleLabel}</Text>
+          </View>
+          <StatusPill
+            label={setupWizard.statusLabel}
+            tone={setupWizard.blocking ? "warn" : "good"}
+          />
+        </View>
+        <Text style={styles.policyDetail}>{setupWizard.progressLabel}</Text>
+        <Text style={styles.policyDetail}>{setupWizard.detailLabel}</Text>
+        <Pressable
+          style={[styles.actionButton, styles.secondaryButton, styles.setupButton]}
+          accessibilityRole="button"
+          {...buildActionButtonAccessibility(setupWizard.actionLabel)}
+          onPress={() => router.push(setupWizard.route)}
+        >
+          <Text style={styles.actionText}>{setupWizard.actionLabel}</Text>
+        </Pressable>
       </View>
 
       <View style={[styles.readinessPanel, summary.canExecute ? styles.readyPanel : styles.blockedPanel]}>
@@ -130,6 +181,7 @@ const styles = StyleSheet.create({
   readinessDetail: { color: "#475569", fontSize: 13, marginTop: 6 },
   actionRow: { flexDirection: "row", gap: 10 },
   actionButton: { alignItems: "center", borderRadius: 8, flex: 1, minHeight: 48, justifyContent: "center", paddingHorizontal: 12 },
+  setupButton: { alignSelf: "flex-start", flex: 0, marginTop: 10, minWidth: 160 },
   stopButton: { backgroundColor: "#dc2626" },
   secondaryButton: { backgroundColor: "#334155" },
   disabledButton: { opacity: 0.48 },
