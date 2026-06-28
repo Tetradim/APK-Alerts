@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const installerScript = new URL("../../../../tools/windows/install-mobile-consolidation.ps1", import.meta.url);
+const launcherScript = new URL("../../../../tools/windows/start-mobile-consolidation-setup.cmd", import.meta.url);
 
 test("windows installer script exposes unattended tailscale and pairing bootstrap steps", () => {
   const script = readFileSync(installerScript, "utf8");
@@ -20,5 +21,19 @@ test("windows installer script exposes unattended tailscale and pairing bootstra
   assert.match(script, /apiPreflight/);
   assert.match(script, /repairCommand/);
   assert.match(script, /MOBILE_CONSOLIDATION_API_KEY/);
+  assert.doesNotMatch(script, /mobile-api-key|secret-value|demo/i);
+});
+
+test("windows setup launcher provides one click elevated bootstrap", () => {
+  const script = readFileSync(launcherScript, "utf8");
+
+  assert.match(script, /install-mobile-consolidation\.ps1/);
+  assert.match(script, /net session/);
+  assert.match(script, /Start-Process/);
+  assert.match(script, /-Verb RunAs/);
+  assert.match(script, /-ExecutionPolicy Bypass/);
+  assert.match(script, /-NoProfile/);
+  assert.match(script, /%ERRORLEVEL%/);
+  assert.match(script, /pause/);
   assert.doesNotMatch(script, /mobile-api-key|secret-value|demo/i);
 });
