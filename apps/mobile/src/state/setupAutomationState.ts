@@ -5,6 +5,10 @@ import {
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 import {
+  buildAlertTestEvidenceSummary,
+  type AlertEvidenceSnapshot,
+} from "./alertEvidenceState";
+import {
   buildDiscordWebViewHealthSummary,
   type DiscordWebViewHealthSnapshot,
 } from "./discordWebViewState";
@@ -13,7 +17,14 @@ import {
   buildPairingDoctorSummary,
   type PairingDoctorSnapshot,
 } from "./pairingDoctorState";
-import type { PhoneEngineRuntimeSnapshot } from "./phoneEngineRuntimeState";
+import {
+  buildPhoneEngineRuntimeSummary,
+  type PhoneEngineRuntimeSnapshot,
+} from "./phoneEngineRuntimeState";
+import {
+  buildPeerAlertOutcomeSummary,
+  type PeerAlertFailsafeSnapshot,
+} from "./peerAlertFailsafeState";
 import type { RemoteConnectionDraft, RemoteEngineSnapshot } from "./remoteEngineState";
 
 export interface WindowsSetupEvidence {
@@ -50,6 +61,24 @@ export interface SetupAutomationItem {
 }
 
 export interface SetupAutomationSummary {
+  statusLabel: string;
+  readyCountLabel: string;
+  blockingCountLabel: string;
+  nextActionLabel: string;
+  blocking: boolean;
+  items: SetupAutomationItem[];
+}
+
+export interface SetupSmokeTestInput {
+  remote: RemoteEngineSnapshot;
+  pairing: PairingDoctorSnapshot;
+  phoneRuntime: PhoneEngineRuntimeSnapshot;
+  alertEvidence: AlertEvidenceSnapshot;
+  peerFailsafe: PeerAlertFailsafeSnapshot;
+  windows: WindowsSetupEvidence;
+}
+
+export interface SetupSmokeTestSummary {
   statusLabel: string;
   readyCountLabel: string;
   blockingCountLabel: string;
@@ -333,6 +362,93 @@ export function buildSetupAutomationSummary(
     readyCountLabel: `${readyCount}/${items.length} ready`,
     blockingCountLabel: blockingCount === 0 ? "No setup blockers" : `${blockingCount} setup blocker(s)`,
     nextActionLabel: firstBlocker?.actionLabel ?? "Run unattended smoke test regularly",
+    blocking: blockingCount > 0,
+    items,
+  };
+}
+
+export function buildSetupSmokeTestSummary(input: SetupSmokeTestInput): SetupSmokeTestSummary {
+  const pairing = buildPairingDoctorSummary(input.pairing);
+  const phoneRuntime = buildPhoneEngineRuntimeSummary(input.phoneRuntime);
+  const latestChain = input.alertEvidence.evidence.chains[0] ?? null;
+  const alertProof = buildAlertTestEvidenceSummary(latestChain);
+  const peer = buildPeerAlertOutcomeSummary(input.peerFailsafe);
+  const remoteHealthy =
+    input.remote.remote.engineHealth === "healthy" && Boolean(input.remote.remote.checkedAt);
+  const imported = Boolean(input.windows.pairingPackageImportedAt) && Boolean(input.remote.connection.baseApiUrl);
+
+  const items: SetupAutomationItem[] = [
+    createItem({
+      key: "mobile_pairing_import",
+      label: "Pairing imported",
+      ready: imported,
+      readyStatus: "Imported",
+      blockedStatus: "Missing",
+      readyDetail: `Imported ${input.windows.pairingPackageImportedAt}`,
+      blockedDetail: "Import the Windows installer pairing package on this phone.",
+      actionLabel: "Import pairing package",
+    }),
+    createItem({
+      key: "pairing_doctor",
+      label: "Pairing Doctor",
+      ready: Boolean(input.pairing.status) && !pairing.blocking,
+      readyStatus: "Passed",
+      blockedStatus: pairing.statusLabel,
+      readyDetail: pairing.detailLabel,
+      blockedDetail: pairing.detailLabel,
+      actionLabel: "Run Pairing Doctor",
+    }),
+    createItem({
+      key: "remote_health",
+      label: "Remote health",
+      ready: remoteHealthy,
+      readyStatus: "Healthy",
+      blockedStatus: "Unproven",
+      readyDetail: `Remote checked ${input.remote.remote.checkedAt}`,
+      blockedDetail: "Check the remote Consolidation API after pairing.",
+      actionLabel: "Check remote health",
+    }),
+    createItem({
+      key: "phone_health",
+      label: "Phone engine health",
+      ready: phoneRuntime.canOwnLease,
+      readyStatus: "Healthy",
+      blockedStatus: phoneRuntime.statusLabel,
+      readyDetail: phoneRuntime.detailLabel,
+      blockedDetail: phoneRuntime.detailLabel,
+      actionLabel: "Start Phone Engine",
+    }),
+    createItem({
+      key: "alert_route",
+      label: "Alert route proof",
+      ready: !alertProof.blocking,
+      readyStatus: alertProof.gateLabel,
+      blockedStatus: alertProof.gateLabel,
+      readyDetail: `${alertProof.contractLabel}; ${alertProof.parserLabel}; ${alertProof.queueLabel}`,
+      blockedDetail: `${alertProof.contractLabel}; ${alertProof.parserLabel}; ${alertProof.queueLabel}`,
+      actionLabel: "Run silent alert test",
+    }),
+    createItem({
+      key: "peer_challenge",
+      label: "Peer challenge",
+      ready: !peer.blocking,
+      readyStatus: peer.gateLabel,
+      blockedStatus: peer.gateLabel,
+      readyDetail: peer.detailLabel,
+      blockedDetail: peer.detailLabel,
+      actionLabel: "Run peer challenge",
+    }),
+  ];
+
+  const readyCount = items.filter((item) => !item.blocking).length;
+  const blockingCount = items.length - readyCount;
+  const firstBlocker = items.find((item) => item.blocking);
+
+  return {
+    statusLabel: blockingCount === 0 ? "Smoke test clear" : "Smoke test blocked",
+    readyCountLabel: `${readyCount}/${items.length} proof(s) clear`,
+    blockingCountLabel: blockingCount === 0 ? "No smoke blockers" : `${blockingCount} smoke blocker(s)`,
+    nextActionLabel: firstBlocker?.actionLabel ?? "Record unattended smoke test pass",
     blocking: blockingCount > 0,
     items,
   };

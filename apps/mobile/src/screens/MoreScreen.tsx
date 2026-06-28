@@ -16,6 +16,7 @@ import {
   useLiveReadinessState,
 } from "@/state/liveReadinessState";
 import { usePairingDoctorState } from "@/state/pairingDoctorState";
+import { usePeerAlertFailsafeState } from "@/state/peerAlertFailsafeState";
 import { usePhoneEngineRuntimeState } from "@/state/phoneEngineRuntimeState";
 import { useReconciliationState } from "@/state/reconciliationState";
 import { useRemoteEngineState } from "@/state/remoteEngineState";
@@ -25,6 +26,7 @@ import {
 } from "@/state/supportBundleState";
 import {
   buildSetupAutomationSummary,
+  buildSetupSmokeTestSummary,
   useSetupAutomationState,
 } from "@/state/setupAutomationState";
 
@@ -51,6 +53,7 @@ export function MoreScreen() {
   const phoneRuntimeSnapshot = usePhoneEngineRuntimeState((state) => state.snapshot);
   const windowsSetup = useSetupAutomationState((state) => state.snapshot.windows);
   const alertEvidenceSnapshot = useAlertEvidenceState((state) => state.snapshot);
+  const peerFailsafeSnapshot = usePeerAlertFailsafeState((state) => state.snapshot);
   const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
   const summary = buildLiveReadinessSummary(snapshot);
   const liveChecklist = buildLiveArmChecklistSummary(snapshot);
@@ -61,6 +64,14 @@ export function MoreScreen() {
     phoneRuntime: phoneRuntimeSnapshot,
     webView: webViewSnapshot,
     liveReadiness: snapshot,
+    windows: windowsSetup,
+  });
+  const smokeTest = buildSetupSmokeTestSummary({
+    remote: remoteSnapshot,
+    pairing: pairingSnapshot,
+    phoneRuntime: phoneRuntimeSnapshot,
+    alertEvidence: alertEvidenceSnapshot,
+    peerFailsafe: peerFailsafeSnapshot,
     windows: windowsSetup,
   });
   const installReadiness = buildMobileInstallReadinessSummary({
@@ -149,6 +160,32 @@ export function MoreScreen() {
         <Text style={styles.detail}>Next: {setupAssistant.nextActionLabel}</Text>
         <Text style={styles.detail}>{setupAssistant.blockingCountLabel}</Text>
         {setupAssistant.items.map((item) => (
+          <View key={item.key} style={styles.checklistRow}>
+            <Text style={styles.label}>{item.label}</Text>
+            <Text
+              style={[
+                styles.checklistStatus,
+                item.blocking ? styles.checklistStatusBlocking : styles.checklistStatusClear,
+              ]}
+            >
+              {item.statusLabel}
+            </Text>
+            <Text style={styles.detail}>{item.detailLabel}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Unattended smoke test</Text>
+            <Text style={styles.panelTitle}>{smokeTest.readyCountLabel}</Text>
+          </View>
+          <StatusPill label={smokeTest.statusLabel} tone={checklistTone(smokeTest.blocking)} />
+        </View>
+        <Text style={styles.detail}>Next: {smokeTest.nextActionLabel}</Text>
+        <Text style={styles.detail}>{smokeTest.blockingCountLabel}</Text>
+        {smokeTest.items.map((item) => (
           <View key={item.key} style={styles.checklistRow}>
             <Text style={styles.label}>{item.label}</Text>
             <Text
