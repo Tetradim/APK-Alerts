@@ -80,21 +80,19 @@ export function MoreScreen() {
     phoneRuntime: phoneRuntimeSnapshot,
     liveReadiness: snapshot,
   });
-  const supportBundleText = useMemo(
+  const supportBundle = useMemo(
     () =>
-      serializeMobileSupportBundle(
-        buildMobileSupportBundle({
-          createdAt: new Date().toISOString(),
-          remote: remoteSnapshot,
-          pairing: pairingSnapshot,
-          phoneRuntime: phoneRuntimeSnapshot,
-          webView: webViewSnapshot,
-          liveReadiness: snapshot,
-          alertEvidence: alertEvidenceSnapshot,
-          reconciliation: reconciliationSnapshot,
-          windowsSetup,
-        }),
-      ),
+      buildMobileSupportBundle({
+        createdAt: new Date().toISOString(),
+        remote: remoteSnapshot,
+        pairing: pairingSnapshot,
+        phoneRuntime: phoneRuntimeSnapshot,
+        webView: webViewSnapshot,
+        liveReadiness: snapshot,
+        alertEvidence: alertEvidenceSnapshot,
+        reconciliation: reconciliationSnapshot,
+        windowsSetup,
+      }),
     [
       alertEvidenceSnapshot,
       pairingSnapshot,
@@ -106,6 +104,11 @@ export function MoreScreen() {
       windowsSetup,
     ],
   );
+  const supportBundleText = useMemo(
+    () => serializeMobileSupportBundle(supportBundle),
+    [supportBundle],
+  );
+  const setupHealthReport = supportBundle.setupHealthReport;
   const readiness = snapshot.remote.readiness;
 
   return (
@@ -288,6 +291,35 @@ export function MoreScreen() {
             </Text>
           ))
         )}
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Setup health report</Text>
+            <Text style={styles.panelTitle}>{setupHealthReport.readyCountLabel}</Text>
+          </View>
+          <StatusPill
+            label={setupHealthReport.statusLabel}
+            tone={checklistTone(setupHealthReport.blocking)}
+          />
+        </View>
+        <Text style={styles.detail}>Next: {setupHealthReport.nextActionLabel}</Text>
+        <Text style={styles.detail}>{setupHealthReport.blockingCountLabel}</Text>
+        {setupHealthReport.rows.map((row) => (
+          <View key={row.key} style={styles.checklistRow}>
+            <Text style={styles.label}>{row.label}</Text>
+            <Text
+              style={[
+                styles.checklistStatus,
+                row.blocking ? styles.checklistStatusBlocking : styles.checklistStatusClear,
+              ]}
+            >
+              {row.statusLabel}
+            </Text>
+            <Text style={styles.detail}>{row.detailLabel}</Text>
+          </View>
+        ))}
       </View>
 
       <View style={styles.panel}>
