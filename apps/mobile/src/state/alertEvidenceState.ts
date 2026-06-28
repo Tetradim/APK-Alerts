@@ -110,6 +110,34 @@ export interface AlertEvidenceTimelineItem {
   blocking: boolean;
 }
 
+export interface AlertAuditDigest {
+  eventId: string;
+  observedAt: string;
+  status: string;
+  alertId: string;
+  auditEventId: string;
+  busEventId: string;
+  sourceKey: string;
+  channelId: string;
+  authorId: string;
+  messageUrl: string;
+  parserConfidence: string;
+  rawTextFingerprint: string;
+  rawTextLength: number;
+  contractLabel: string;
+  parserLabel: string;
+  sourceGateLabel: string;
+  sourceLabel: string;
+  queueGateLabel: string;
+  queueLabel: string;
+  reconciliationGateLabel: string;
+  reconciliationLabel: string;
+  orderLabel: string;
+  positionLabel: string;
+  blocking: boolean;
+  blockingLabels: string[];
+}
+
 export interface AlertEvidenceState {
   snapshot: AlertEvidenceSnapshot;
   activeRequestId: number;
@@ -473,6 +501,55 @@ export function buildAlertEvidenceTimeline(
       reconciliation.blocking,
     ),
   ];
+}
+
+export function buildAlertAuditDigest(
+  chain: AlertEvidenceChain | null | undefined,
+  rows: ReconciliationRow[],
+): AlertAuditDigest {
+  const alertTest = buildAlertTestEvidenceSummary(chain);
+  const source = buildSourcePolicySummary(chain);
+  const queue = buildQueuePlaceEvidenceSummary(chain);
+  const reconciliation = buildAlertReconciliationTraceSummary(chain, rows);
+  const ingestion = chain?.decision?.decision ?? chain?.signal?.ingestion ?? null;
+  const rawText = chain?.rawText ?? "";
+  const blocking = alertTest.blocking || source.blocking || queue.blocking || reconciliation.blocking;
+
+  return {
+    eventId: chain?.eventId ?? "",
+    observedAt: chain?.observedAt ?? "",
+    status: chain?.status ?? "unknown",
+    alertId: ingestion?.alertId ?? "",
+    auditEventId: chain?.decision?.auditEventId ?? "",
+    busEventId: chain?.signal?.busEventId ?? "",
+    sourceKey: chain?.decision?.source.key ?? "",
+    channelId: chain?.decision?.channel.id || chain?.signal?.channelId || "",
+    authorId: chain?.decision?.author.id || chain?.signal?.authorId || "",
+    messageUrl: chain?.decision?.channel.messageUrl || chain?.signal?.messageUrl || "",
+    parserConfidence: chain?.parserConfidence ?? "none",
+    rawTextFingerprint: buildRawTextFingerprint(rawText),
+    rawTextLength: rawText.length,
+    contractLabel: alertTest.contractLabel,
+    parserLabel: alertTest.parserLabel,
+    sourceGateLabel: source.gateLabel,
+    sourceLabel: source.sourceLabel,
+    queueGateLabel: queue.gateLabel,
+    queueLabel: queue.queueLabel,
+    reconciliationGateLabel: reconciliation.gateLabel,
+    reconciliationLabel: reconciliation.reconciliationLabel,
+    orderLabel: reconciliation.orderLabel,
+    positionLabel: reconciliation.positionLabel,
+    blocking,
+    blockingLabels: blocking
+      ? uniqueNonEmpty([
+          alertTest.blocking ? alertTest.contractLabel : "",
+          alertTest.blocking ? alertTest.parserLabel : "",
+          source.blocking ? source.statusLabel : "",
+          queue.blocking ? queue.gateLabel : "",
+          reconciliation.blocking ? reconciliation.reconciliationLabel : "",
+        ])
+      : [],
+  };
 }
 
 export function buildQueuePlaceEvidenceSummary(chain: AlertEvidenceChain | null | undefined): QueuePlaceEvidenceSummary {
@@ -904,6 +981,27 @@ function firstNonEmptyText(...values: string[]): string {
     }
   }
   return "";
+}
+
+function buildRawTextFingerprint(rawText: string): string {
+  const normalized = rawText.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  return `fnv1a32:${fnv1a32Hex(normalized)}`;
+}
+
+function fnv1a32Hex(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+function uniqueNonEmpty(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
 function formatStatusLabel(status: string): string {

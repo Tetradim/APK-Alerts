@@ -1,5 +1,7 @@
 import {
+  buildAlertAuditDigest,
   buildAlertTestEvidenceSummary,
+  type AlertAuditDigest,
   type AlertEvidenceSnapshot,
 } from "./alertEvidenceState";
 import {
@@ -94,6 +96,8 @@ export interface MobileSupportBundle {
     latestEventId: string;
     latestStatus: string;
     bridgeHealthStatus: string;
+    latestDigest: AlertAuditDigest | null;
+    digests: AlertAuditDigest[];
   };
   reconciliation: {
     checkedAt: string;
@@ -216,6 +220,9 @@ export function buildSetupHealthReportSummary(input: MobileSupportBundleInput): 
 
 export function buildMobileSupportBundle(input: MobileSupportBundleInput): MobileSupportBundle {
   const latestChain = input.alertEvidence.evidence.chains[0] ?? null;
+  const alertDigests = input.alertEvidence.evidence.chains
+    .slice(0, 10)
+    .map((chain) => buildAlertAuditDigest(chain, input.reconciliation.remote.rows));
   const reconciliationSummary = input.reconciliation.remote.summary;
   const apiKeyConfigured = Boolean(input.remote.connection.apiKey);
   const setupAssistantSummary = buildSetupAutomationSummary({
@@ -269,6 +276,8 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
       latestEventId: latestChain?.eventId ?? "",
       latestStatus: latestChain?.status ?? "",
       bridgeHealthStatus: input.alertEvidence.evidence.bridgeHealth.status,
+      latestDigest: alertDigests[0] ?? null,
+      digests: alertDigests,
     },
     reconciliation: {
       checkedAt: input.reconciliation.remote.checkedAt,

@@ -13,6 +13,7 @@ import {
   buildAlertReconciliationTraceSummary,
   buildAlertEvidenceTimeline,
   buildAlertTestEvidenceSummary,
+  buildAlertAuditDigest,
   buildBridgeSupervisorSummary,
   buildQueuePlaceEvidenceSummary,
   buildSourcePolicySummary,
@@ -154,6 +155,85 @@ test("alert evidence timeline orders see parse decide queue and reconcile stages
   assert.equal(timeline[3]?.statusLabel, "No order queued");
   assert.equal(timeline[4]?.statusLabel, "Reconciled");
   assert.equal(timeline.some((item) => item.blocking), false);
+});
+
+test("alert audit digest redacts raw text while preserving proof ids and gates", () => {
+  const queuedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-digest",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-digest",
+      channel: {
+        id: "chrome-alerts",
+        name: "chrome-alerts",
+        url: "https://discord.com/channels/guild/channel",
+        message_url: "https://discord.com/channels/guild/channel/message",
+      },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parsed: { ticker: "SPY" },
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
+        channel_url_allowed: true,
+        allowed_author_id_count: 1,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-digest",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const [row] = normalizeReconciliationPayload([
+    {
+      alert_id: "alert-digest",
+      trade_id: "trade-digest",
+      trade_status: "filled",
+      order_id: "order-digest",
+      position_id: "position-digest",
+      position_status: "open",
+      simulated: false,
+      attention_reason: "",
+    },
+  ]);
+  const chain = buildAlertEvidenceChains({ decisions: [queuedDecision] })[0];
+  assert.ok(chain);
+  assert.ok(row);
+
+  const digest = buildAlertAuditDigest(chain, [row]);
+  const serialized = JSON.stringify(digest);
+
+  assert.equal(digest.eventId, "chrome-message-digest");
+  assert.equal(digest.auditEventId, "audit-digest");
+  assert.equal(digest.alertId, "alert-digest");
+  assert.equal(digest.sourceKey, "chrome-alerts");
+  assert.equal(digest.channelId, "chrome-alerts");
+  assert.equal(digest.authorId, "mike");
+  assert.equal(digest.parserConfidence, "high");
+  assert.equal(digest.sourceGateLabel, "Source gate clear");
+  assert.equal(digest.queueGateLabel, "Queue proof clear");
+  assert.equal(digest.reconciliationGateLabel, "Trace clear");
+  assert.equal(digest.blocking, false);
+  assert.match(digest.rawTextFingerprint, /^fnv1a32:[0-9a-f]{8}$/);
+  assert.equal(digest.rawTextLength, "BTO SPY 500C 6/21 @ 1.25".length);
+  assert.doesNotMatch(serialized, /BTO SPY/);
 });
 
 test("skipped alert evidence surfaces parser and source skip reason", () => {

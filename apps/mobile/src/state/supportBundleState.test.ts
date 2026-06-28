@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+  normalizeBridgeAlertDecisionEvent,
+  normalizeReconciliationPayload,
+  buildAlertEvidenceChains,
+} from "@apk-alerts/contracts";
+import {
   buildSetupHealthReportSummary,
   buildMobileSupportBundle,
   serializeMobileSupportBundle,
@@ -241,4 +247,72 @@ test("mobile support bundle includes setup assistant evidence without exposing i
   assert.equal(bundle.setupHealthReport.statusLabel, "Setup health blocked");
   assert.equal(bundle.setupAssistant.windows.tailscaleIp, "100.90.10.11");
   assert.doesNotMatch(serialized, /mobile-api-key/);
+});
+
+test("mobile support bundle includes redacted alert audit digests", () => {
+  const alertText = "BTO SPY 500C 6/21 @ 1.25";
+  const decision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-support-digest",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted and queued.",
+    severity: "info",
+    created_at: "2026-06-28T10:03:30Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-support-digest",
+      channel: {
+        id: "chrome-alerts",
+        name: "chrome-alerts",
+        url: "https://discord.com/channels/guild/channel",
+        message_url: "https://discord.com/channels/guild/channel/message",
+      },
+      author: { id: "author-1", name: "source" },
+      raw_text: alertText,
+      parsed: { ticker: "SPY" },
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: 1,
+        channel_url_allowed: true,
+        allowed_author_id_count: 1,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-support-digest",
+        trade_requested: true,
+        trade_request_reason: "risk approved; order intent queued",
+        skip_reason: "",
+      },
+    },
+  });
+  const input = buildDefaultSupportInput();
+  input.alertEvidence.evidence.chains = buildAlertEvidenceChains({ decisions: [decision] });
+  input.reconciliation.remote.rows = normalizeReconciliationPayload([
+    {
+      alert_id: "alert-support-digest",
+      order_id: "order-support-digest",
+      position_id: "position-support-digest",
+      position_status: "open",
+      simulated: false,
+    },
+  ]);
+
+  const bundle = buildMobileSupportBundle(input);
+  const serialized = serializeMobileSupportBundle(bundle);
+
+  assert.equal(bundle.alertEvidence.latestDigest?.eventId, "chrome-message-support-digest");
+  assert.equal(bundle.alertEvidence.latestDigest?.alertId, "alert-support-digest");
+  assert.equal(bundle.alertEvidence.latestDigest?.auditEventId, "audit-support-digest");
+  assert.equal(bundle.alertEvidence.digests.length, 1);
+  assert.match(bundle.alertEvidence.latestDigest?.rawTextFingerprint ?? "", /^fnv1a32:[0-9a-f]{8}$/);
+  assert.doesNotMatch(serialized, /BTO SPY/);
 });

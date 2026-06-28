@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/StatusPill";
 import {
   buildAlertEvidenceSummary,
   buildAlertEvidenceTimeline,
+  buildAlertAuditDigest,
   buildAlertReconciliationTraceSummary,
   buildAlertTestEvidenceSummary,
   buildBridgeSupervisorSummary,
@@ -157,6 +158,7 @@ export function AlertsScreen() {
             reconciliationSnapshot.remote.rows,
           );
           const timeline = buildAlertEvidenceTimeline(chain, reconciliationSnapshot.remote.rows);
+          const digest = buildAlertAuditDigest(chain, reconciliationSnapshot.remote.rows);
           return (
             <View key={chain.eventId} style={styles.panel}>
               <View style={styles.panelHeader}>
@@ -168,6 +170,10 @@ export function AlertsScreen() {
               </View>
               <Text style={styles.detail}>Author: {chain.authorName || "unknown"}</Text>
               <Text style={styles.detail}>Parser confidence: {chain.parserConfidence}</Text>
+              <Text style={styles.auditText}>
+                Digest {digest.rawTextFingerprint || "missing"} - alert {digest.alertId || "missing"} - audit{" "}
+                {digest.auditEventId || "missing"}
+              </Text>
               <Text style={styles.detail}>Decision: {chain.latestReason || "No decision reason"}</Text>
               <View style={styles.evidenceHeader}>
                 <Text style={styles.label}>Evidence timeline</Text>
