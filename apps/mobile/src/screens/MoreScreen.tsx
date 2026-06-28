@@ -23,6 +23,10 @@ import {
   buildMobileSupportBundle,
   serializeMobileSupportBundle,
 } from "@/state/supportBundleState";
+import {
+  buildSetupAutomationSummary,
+  getDefaultWindowsSetupEvidence,
+} from "@/state/setupAutomationState";
 
 function readinessTone(label: string): "good" | "warn" | "bad" | "neutral" {
   if (label === "Ready") {
@@ -50,6 +54,15 @@ export function MoreScreen() {
   const summary = buildLiveReadinessSummary(snapshot);
   const liveChecklist = buildLiveArmChecklistSummary(snapshot);
   const replayEvidence = buildReplayAcceptanceEvidenceSummary(snapshot);
+  const windowsSetup = useMemo(() => getDefaultWindowsSetupEvidence(), []);
+  const setupAssistant = buildSetupAutomationSummary({
+    remote: remoteSnapshot,
+    pairing: pairingSnapshot,
+    phoneRuntime: phoneRuntimeSnapshot,
+    webView: webViewSnapshot,
+    liveReadiness: snapshot,
+    windows: windowsSetup,
+  });
   const installReadiness = buildMobileInstallReadinessSummary({
     pairing: pairingSnapshot,
     webView: webViewSnapshot,
@@ -68,6 +81,7 @@ export function MoreScreen() {
           liveReadiness: snapshot,
           alertEvidence: alertEvidenceSnapshot,
           reconciliation: reconciliationSnapshot,
+          windowsSetup,
         }),
       ),
     [
@@ -78,6 +92,7 @@ export function MoreScreen() {
       remoteSnapshot,
       snapshot,
       webViewSnapshot,
+      windowsSetup,
     ],
   );
   const readiness = snapshot.remote.readiness;
@@ -118,6 +133,35 @@ export function MoreScreen() {
       <View style={styles.tileRow}>
         <MetricTile label="Broker" value={summary.brokerLabel} detail={summary.reconciliationLabel} />
         <MetricTile label="Ingestion" value={summary.ingestionLabel} detail={summary.replayLabel} />
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.panelHeader}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.label}>Setup assistant</Text>
+            <Text style={styles.panelTitle}>{setupAssistant.readyCountLabel}</Text>
+          </View>
+          <StatusPill
+            label={setupAssistant.statusLabel}
+            tone={checklistTone(setupAssistant.blocking)}
+          />
+        </View>
+        <Text style={styles.detail}>Next: {setupAssistant.nextActionLabel}</Text>
+        <Text style={styles.detail}>{setupAssistant.blockingCountLabel}</Text>
+        {setupAssistant.items.map((item) => (
+          <View key={item.key} style={styles.checklistRow}>
+            <Text style={styles.label}>{item.label}</Text>
+            <Text
+              style={[
+                styles.checklistStatus,
+                item.blocking ? styles.checklistStatusBlocking : styles.checklistStatusClear,
+              ]}
+            >
+              {item.statusLabel}
+            </Text>
+            <Text style={styles.detail}>{item.detailLabel}</Text>
+          </View>
+        ))}
       </View>
 
       <View style={styles.panel}>

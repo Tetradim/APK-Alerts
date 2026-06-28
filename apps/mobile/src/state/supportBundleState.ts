@@ -14,6 +14,10 @@ import {
 } from "./phoneEngineRuntimeState";
 import type { ReconciliationSnapshot } from "./reconciliationState";
 import type { RemoteEngineSnapshot } from "./remoteEngineState";
+import {
+  buildSetupAutomationSummary,
+  type WindowsSetupEvidence,
+} from "./setupAutomationState";
 
 export interface MobileSupportBundleInput {
   createdAt: string;
@@ -24,6 +28,7 @@ export interface MobileSupportBundleInput {
   liveReadiness: LiveReadinessSnapshot;
   alertEvidence: AlertEvidenceSnapshot;
   reconciliation: ReconciliationSnapshot;
+  windowsSetup: WindowsSetupEvidence;
 }
 
 export interface MobileSupportBundle {
@@ -73,6 +78,10 @@ export interface MobileSupportBundle {
     rowCount: number;
     unresolvedCount: number;
     unresolvedReasons: string[];
+  };
+  setupAssistant: {
+    summary: ReturnType<typeof buildSetupAutomationSummary>;
+    windows: WindowsSetupEvidence;
   };
 }
 
@@ -129,6 +138,17 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
       rowCount: reconciliationSummary.rowCount,
       unresolvedCount: reconciliationSummary.unresolvedCount,
       unresolvedReasons: reconciliationSummary.unresolvedReasons,
+    },
+    setupAssistant: {
+      summary: buildSetupAutomationSummary({
+        remote: input.remote,
+        pairing: input.pairing,
+        phoneRuntime: input.phoneRuntime,
+        webView: input.webView,
+        liveReadiness: input.liveReadiness,
+        windows: input.windowsSetup,
+      }),
+      windows: input.windowsSetup,
     },
   };
 }
