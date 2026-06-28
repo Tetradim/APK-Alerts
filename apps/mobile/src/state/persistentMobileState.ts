@@ -1,6 +1,11 @@
 import { remoteEngineStore } from "./remoteEngineState";
-import type { SecureSettingsStorage } from "./secureSettingsPersistence";
+import {
+  loadSetupAutomationEvidence,
+  saveSetupAutomationEvidence,
+  type SecureSettingsStorage,
+} from "./secureSettingsPersistence";
 import { useSettingsState } from "./settingsState";
+import { setupAutomationStore } from "./setupAutomationState";
 
 export async function hydratePersistentMobileState(
   storage: SecureSettingsStorage,
@@ -10,6 +15,10 @@ export async function hydratePersistentMobileState(
     useSettingsState.getState().hydrateFailoverSettings(storage),
     useSettingsState.getState().hydrateDiscordIngestionSettings(storage),
   ]);
+  const setupEvidence = await loadSetupAutomationEvidence(storage);
+  if (setupEvidence) {
+    setupAutomationStore.getState().replaceWindowsEvidence(setupEvidence);
+  }
 }
 
 export async function persistPersistentMobileState(
@@ -19,6 +28,7 @@ export async function persistPersistentMobileState(
     remoteEngineStore.getState().persistConnection(storage),
     useSettingsState.getState().persistFailoverSettings(storage),
     useSettingsState.getState().persistDiscordIngestionSettings(storage),
+    saveSetupAutomationEvidence(storage, setupAutomationStore.getState().snapshot.windows),
   ]);
 }
 
@@ -41,9 +51,15 @@ export function installPersistentMobileState(
       void state.persistDiscordIngestionSettings(storage).catch(() => undefined);
     }
   });
+  const unsubscribeSetup = setupAutomationStore.subscribe((state, previousState) => {
+    if (state.snapshot.windows !== previousState.snapshot.windows) {
+      void saveSetupAutomationEvidence(storage, state.snapshot.windows).catch(() => undefined);
+    }
+  });
 
   return () => {
     unsubscribeRemote();
     unsubscribeSettings();
+    unsubscribeSetup();
   };
 }

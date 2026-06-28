@@ -1,4 +1,10 @@
 import {
+  normalizeRemotePairingConfigPayload,
+  type RemotePairingConfig,
+} from "@apk-alerts/contracts";
+import { useStore } from "zustand";
+import { createStore } from "zustand/vanilla";
+import {
   buildDiscordWebViewHealthSummary,
   type DiscordWebViewHealthSnapshot,
 } from "./discordWebViewState";
@@ -8,7 +14,7 @@ import {
   type PairingDoctorSnapshot,
 } from "./pairingDoctorState";
 import type { PhoneEngineRuntimeSnapshot } from "./phoneEngineRuntimeState";
-import type { RemoteEngineSnapshot } from "./remoteEngineState";
+import type { RemoteConnectionDraft, RemoteEngineSnapshot } from "./remoteEngineState";
 
 export interface WindowsSetupEvidence {
   installerRanAt: string;
@@ -52,6 +58,36 @@ export interface SetupAutomationSummary {
   items: SetupAutomationItem[];
 }
 
+export interface SetupAutomationSnapshot {
+  windows: WindowsSetupEvidence;
+  lastImportError: string;
+  lastImportedAt: string;
+}
+
+export interface SetupAutomationState {
+  snapshot: SetupAutomationSnapshot;
+  updateWindowsEvidence: (patch: Partial<WindowsSetupEvidence>) => void;
+  replaceWindowsEvidence: (evidence: WindowsSetupEvidence) => void;
+  importPairingPackage: (rawPackage: string) => MobilePairingPackageImportResult;
+  clearSetupEvidence: () => void;
+}
+
+export interface MobilePairingPackageImportResult {
+  ok: boolean;
+  connection: RemoteConnectionDraft | null;
+  config: RemotePairingConfig | null;
+  evidence: WindowsSetupEvidence;
+  error: string;
+}
+
+export function getDefaultSetupAutomationSnapshot(): SetupAutomationSnapshot {
+  return {
+    windows: getDefaultWindowsSetupEvidence(),
+    lastImportError: "",
+    lastImportedAt: "",
+  };
+}
+
 export function getDefaultWindowsSetupEvidence(): WindowsSetupEvidence {
   return {
     installerRanAt: "",
@@ -66,6 +102,100 @@ export function getDefaultWindowsSetupEvidence(): WindowsSetupEvidence {
     pairingPackageCreatedAt: "",
     pairingPackageImportedAt: "",
     unattendedSmokeTestPassedAt: "",
+  };
+}
+
+export function createSetupAutomationStore(now: () => string = () => new Date().toISOString()) {
+  return createStore<SetupAutomationState>()((set, get) => ({
+    snapshot: getDefaultSetupAutomationSnapshot(),
+    updateWindowsEvidence: (patch) =>
+      set((state) => ({
+        snapshot: {
+          ...state.snapshot,
+          windows: {
+            ...state.snapshot.windows,
+            ...patch,
+          },
+        },
+      })),
+    replaceWindowsEvidence: (evidence) =>
+      set((state) => ({
+        snapshot: {
+          ...state.snapshot,
+          windows: evidence,
+        },
+      })),
+    importPairingPackage: (rawPackage) => {
+      const result = importMobilePairingPackage(rawPackage, get().snapshot.windows, now());
+      set((state) => ({
+        snapshot: {
+          ...state.snapshot,
+          windows: result.ok ? result.evidence : state.snapshot.windows,
+          lastImportError: result.error,
+          lastImportedAt: result.ok ? result.evidence.pairingPackageImportedAt : state.snapshot.lastImportedAt,
+        },
+      }));
+      return result;
+    },
+    clearSetupEvidence: () =>
+      set({
+        snapshot: getDefaultSetupAutomationSnapshot(),
+      }),
+  }));
+}
+
+export const setupAutomationStore = createSetupAutomationStore();
+
+export function useSetupAutomationState(): SetupAutomationState;
+export function useSetupAutomationState<T>(selector: (state: SetupAutomationState) => T): T;
+export function useSetupAutomationState<T>(selector?: (state: SetupAutomationState) => T) {
+  return selector ? useStore(setupAutomationStore, selector) : useStore(setupAutomationStore);
+}
+
+export function importMobilePairingPackage(
+  rawPackage: string,
+  currentEvidence: WindowsSetupEvidence,
+  importedAt: string,
+): MobilePairingPackageImportResult {
+  const parsed = parseJsonRecord(rawPackage);
+  if (!parsed) {
+    return failPairingImport(currentEvidence, "Pairing package must be valid JSON.");
+  }
+
+  const config = normalizeRemotePairingConfigPayload(parsed);
+  const remoteApiUrl = config.remoteApiUrl.trim();
+  const apiKey = config.apiKey.trim();
+
+  if (config.version <= 0 || config.app !== "mobile-consolidation") {
+    return failPairingImport(currentEvidence, "Pairing package is not for Mobile Consolidation.");
+  }
+
+  if (!isHttpUrl(remoteApiUrl)) {
+    return failPairingImport(currentEvidence, "Pairing package must include a valid remote API URL.");
+  }
+
+  if (!apiKey) {
+    return failPairingImport(currentEvidence, "Pairing package must include an API key.");
+  }
+
+  return {
+    ok: true,
+    connection: {
+      baseApiUrl: remoteApiUrl,
+      apiKey,
+    },
+    config: {
+      ...config,
+      remoteApiUrl,
+      apiKey,
+    },
+    evidence: {
+      ...currentEvidence,
+      pairingPackageCreatedAt: config.createdAt || currentEvidence.pairingPackageCreatedAt,
+      pairingPackageImportedAt: importedAt,
+      tailscaleIp: extractTailscaleIp(remoteApiUrl) || currentEvidence.tailscaleIp,
+    },
+    error: "",
   };
 }
 
@@ -206,6 +336,56 @@ export function buildSetupAutomationSummary(
     blocking: blockingCount > 0,
     items,
   };
+}
+
+function parseJsonRecord(rawPackage: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(rawPackage);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function failPairingImport(
+  currentEvidence: WindowsSetupEvidence,
+  error: string,
+): MobilePairingPackageImportResult {
+  return {
+    ok: false,
+    connection: null,
+    config: null,
+    evidence: currentEvidence,
+    error,
+  };
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function extractTailscaleIp(remoteApiUrl: string): string {
+  try {
+    const { hostname } = new URL(remoteApiUrl);
+    const parts = hostname.split(".").map((part) => Number(part));
+    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) {
+      return "";
+    }
+    const [first, second] = parts as [number, number, number, number];
+    if (first === 100 && second >= 64 && second <= 127) {
+      return hostname;
+    }
+    return "";
+  } catch {
+    return "";
+  }
 }
 
 function createItem({

@@ -5,10 +5,15 @@ import {
   type FailoverSettings,
 } from "@apk-alerts/contracts";
 import type { RemoteConnectionDraft } from "./remoteEngineState";
+import {
+  getDefaultWindowsSetupEvidence,
+  type WindowsSetupEvidence,
+} from "./setupAutomationState";
 
 export const REMOTE_CONNECTION_STORAGE_KEY = "apk-alerts.remote-connection.v1";
 export const FAILOVER_SETTINGS_STORAGE_KEY = "apk-alerts.failover-settings.v1";
 export const DISCORD_INGESTION_SETTINGS_STORAGE_KEY = "apk-alerts.discord-ingestion-settings.v1";
+export const SETUP_AUTOMATION_STORAGE_KEY = "apk-alerts.setup-automation.v1";
 
 export interface SecureSettingsStorage {
   getItemAsync: (key: string) => Promise<string | null>;
@@ -66,11 +71,47 @@ export async function saveDiscordIngestionSettings(
   );
 }
 
+export async function saveSetupAutomationEvidence(
+  storage: SecureSettingsStorage,
+  evidence: WindowsSetupEvidence,
+): Promise<void> {
+  await storage.setItemAsync(SETUP_AUTOMATION_STORAGE_KEY, JSON.stringify(normalizeSetupEvidence(evidence)));
+}
+
+export async function loadSetupAutomationEvidence(
+  storage: SecureSettingsStorage,
+): Promise<WindowsSetupEvidence | null> {
+  const payload = await readJsonRecord(storage, SETUP_AUTOMATION_STORAGE_KEY);
+  return payload ? normalizeSetupEvidence(payload) : null;
+}
+
 function normalizeRemoteConnectionDraft(draft: RemoteConnectionDraft): RemoteConnectionDraft {
   return {
     baseApiUrl: draft.baseApiUrl.trim(),
     apiKey: draft.apiKey.trim(),
   };
+}
+
+function normalizeSetupEvidence(payload: Record<string, unknown> | WindowsSetupEvidence): WindowsSetupEvidence {
+  const defaults = getDefaultWindowsSetupEvidence();
+  return {
+    installerRanAt: cleanString(payload.installerRanAt) || defaults.installerRanAt,
+    consolidationRepoReady: payload.consolidationRepoReady === true,
+    tailscaleInstalled: payload.tailscaleInstalled === true,
+    tailscaleLoggedIn: payload.tailscaleLoggedIn === true,
+    tailscaleIp: cleanString(payload.tailscaleIp) || defaults.tailscaleIp,
+    tailscaleMagicDnsName: cleanString(payload.tailscaleMagicDnsName) || defaults.tailscaleMagicDnsName,
+    remoteApiBound: payload.remoteApiBound === true,
+    windowsFirewallOpen: payload.windowsFirewallOpen === true,
+    apiReachableFromPhone: payload.apiReachableFromPhone === true,
+    pairingPackageCreatedAt: cleanString(payload.pairingPackageCreatedAt) || defaults.pairingPackageCreatedAt,
+    pairingPackageImportedAt: cleanString(payload.pairingPackageImportedAt) || defaults.pairingPackageImportedAt,
+    unattendedSmokeTestPassedAt: cleanString(payload.unattendedSmokeTestPassedAt) || defaults.unattendedSmokeTestPassedAt,
+  };
+}
+
+function cleanString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export async function loadFailoverSettings(

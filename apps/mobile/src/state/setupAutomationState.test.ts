@@ -7,7 +7,9 @@ import { getDefaultPhoneEngineRuntimeSnapshot } from "./phoneEngineRuntimeState.
 import { getDefaultRemoteEngineSnapshot } from "./remoteEngineState.js";
 import {
   buildSetupAutomationSummary,
+  createSetupAutomationStore,
   getDefaultWindowsSetupEvidence,
+  importMobilePairingPackage,
 } from "./setupAutomationState.js";
 
 function buildDefaultInput() {
@@ -95,4 +97,73 @@ test("setup automation clears only with remote phone pairing health and smoke ev
   assert.equal(summary.readyCountLabel, "10/10 ready");
   assert.equal(summary.blocking, false);
   assert.equal(summary.nextActionLabel, "Run unattended smoke test regularly");
+});
+
+test("pairing package import extracts remote credentials and records mobile import evidence", () => {
+  const result = importMobilePairingPackage(
+    JSON.stringify({
+      version: 1,
+      app: "mobile-consolidation",
+      createdAt: "2026-06-28T10:01:00Z",
+      remoteApiUrl: " http://100.90.10.11:8003/api ",
+      apiKey: " mobile-secret ",
+      transportHint: "tailscale",
+      requiredEndpoints: [],
+    }),
+    getDefaultWindowsSetupEvidence(),
+    "2026-06-28T10:02:00Z",
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.connection?.baseApiUrl, "http://100.90.10.11:8003/api");
+  assert.equal(result.connection?.apiKey, "mobile-secret");
+  assert.equal(result.evidence.pairingPackageCreatedAt, "2026-06-28T10:01:00Z");
+  assert.equal(result.evidence.pairingPackageImportedAt, "2026-06-28T10:02:00Z");
+  assert.equal(result.evidence.tailscaleIp, "100.90.10.11");
+  assert.equal(result.evidence.tailscaleInstalled, false);
+  assert.equal(result.evidence.remoteApiBound, false);
+});
+
+test("pairing package import fails closed for malformed or incomplete package payloads", () => {
+  const current = {
+    ...getDefaultWindowsSetupEvidence(),
+    pairingPackageImportedAt: "previous",
+  };
+  const result = importMobilePairingPackage(
+    JSON.stringify({
+      version: 1,
+      app: "mobile-consolidation",
+      remoteApiUrl: "http://100.90.10.11:8003/api",
+      apiKey: "",
+    }),
+    current,
+    "2026-06-28T10:02:00Z",
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.connection, null);
+  assert.equal(result.evidence.pairingPackageImportedAt, "previous");
+  assert.match(result.error, /API key/);
+});
+
+test("setup automation store records valid pairing imports and preserves evidence on failures", () => {
+  const store = createSetupAutomationStore(() => "2026-06-28T10:02:00Z");
+  const result = store.getState().importPairingPackage(JSON.stringify({
+    version: 1,
+    app: "mobile-consolidation",
+    createdAt: "2026-06-28T10:01:00Z",
+    remoteApiUrl: "http://100.90.10.11:8003/api",
+    apiKey: "mobile-secret",
+    transportHint: "tailscale",
+  }));
+
+  assert.equal(result.ok, true);
+  assert.equal(store.getState().snapshot.windows.pairingPackageImportedAt, "2026-06-28T10:02:00Z");
+  assert.equal(store.getState().snapshot.lastImportError, "");
+
+  const failed = store.getState().importPairingPackage("not json");
+
+  assert.equal(failed.ok, false);
+  assert.equal(store.getState().snapshot.windows.pairingPackageImportedAt, "2026-06-28T10:02:00Z");
+  assert.match(store.getState().snapshot.lastImportError, /valid JSON/);
 });

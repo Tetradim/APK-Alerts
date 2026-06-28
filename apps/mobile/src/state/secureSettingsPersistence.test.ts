@@ -8,14 +8,18 @@ import {
   DISCORD_INGESTION_SETTINGS_STORAGE_KEY,
   FAILOVER_SETTINGS_STORAGE_KEY,
   REMOTE_CONNECTION_STORAGE_KEY,
+  SETUP_AUTOMATION_STORAGE_KEY,
   loadDiscordIngestionSettings,
   loadFailoverSettings,
   loadRemoteConnection,
+  loadSetupAutomationEvidence,
   saveDiscordIngestionSettings,
   saveFailoverSettings,
   saveRemoteConnection,
+  saveSetupAutomationEvidence,
   type SecureSettingsStorage,
 } from "./secureSettingsPersistence.js";
+import { getDefaultWindowsSetupEvidence } from "./setupAutomationState.js";
 
 function memoryStorage(initial: Record<string, string> = {}): SecureSettingsStorage & {
   values: Record<string, string>;
@@ -89,4 +93,20 @@ test("secure persistence saves and normalizes discord ingestion settings includi
   assert.deepEqual(loaded?.routePriority, ["webview", "bot_engine", "foreground_service"]);
   assert.equal(loaded?.foregroundServiceEnabled, false);
   assert.equal(JSON.parse(storage.values[DISCORD_INGESTION_SETTINGS_STORAGE_KEY]).botToken, "bot-token");
+});
+
+test("secure persistence saves setup evidence without pairing package secrets", async () => {
+  const storage = memoryStorage();
+  const evidence = {
+    ...getDefaultWindowsSetupEvidence(),
+    pairingPackageImportedAt: "2026-06-28T10:02:00Z",
+    tailscaleIp: "100.90.10.11",
+  };
+
+  await saveSetupAutomationEvidence(storage, evidence);
+  const loaded = await loadSetupAutomationEvidence(storage);
+
+  assert.equal(loaded?.pairingPackageImportedAt, "2026-06-28T10:02:00Z");
+  assert.equal(loaded?.tailscaleIp, "100.90.10.11");
+  assert.doesNotMatch(storage.values[SETUP_AUTOMATION_STORAGE_KEY], /apiKey|mobile-secret/i);
 });

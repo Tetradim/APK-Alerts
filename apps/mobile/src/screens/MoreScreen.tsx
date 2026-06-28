@@ -25,7 +25,7 @@ import {
 } from "@/state/supportBundleState";
 import {
   buildSetupAutomationSummary,
-  getDefaultWindowsSetupEvidence,
+  useSetupAutomationState,
 } from "@/state/setupAutomationState";
 
 function readinessTone(label: string): "good" | "warn" | "bad" | "neutral" {
@@ -49,12 +49,12 @@ export function MoreScreen() {
   const pairingSnapshot = usePairingDoctorState((state) => state.snapshot);
   const webViewSnapshot = useDiscordWebViewHealthState((state) => state.snapshot);
   const phoneRuntimeSnapshot = usePhoneEngineRuntimeState((state) => state.snapshot);
+  const windowsSetup = useSetupAutomationState((state) => state.snapshot.windows);
   const alertEvidenceSnapshot = useAlertEvidenceState((state) => state.snapshot);
   const reconciliationSnapshot = useReconciliationState((state) => state.snapshot);
   const summary = buildLiveReadinessSummary(snapshot);
   const liveChecklist = buildLiveArmChecklistSummary(snapshot);
   const replayEvidence = buildReplayAcceptanceEvidenceSummary(snapshot);
-  const windowsSetup = useMemo(() => getDefaultWindowsSetupEvidence(), []);
   const setupAssistant = buildSetupAutomationSummary({
     remote: remoteSnapshot,
     pairing: pairingSnapshot,

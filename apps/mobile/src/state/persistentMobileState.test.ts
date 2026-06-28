@@ -5,8 +5,10 @@ import { remoteEngineStore } from "./remoteEngineState.js";
 import {
   FAILOVER_SETTINGS_STORAGE_KEY,
   REMOTE_CONNECTION_STORAGE_KEY,
+  SETUP_AUTOMATION_STORAGE_KEY,
   type SecureSettingsStorage,
 } from "./secureSettingsPersistence.js";
+import { setupAutomationStore } from "./setupAutomationState.js";
 import { useSettingsState } from "./settingsState.js";
 import {
   hydratePersistentMobileState,
@@ -41,6 +43,10 @@ test("persistent mobile state hydrates remote credentials and failover settings"
       ...DEFAULT_FAILOVER_SETTINGS,
       enginePriority: "remote_then_phone",
     }),
+    [SETUP_AUTOMATION_STORAGE_KEY]: JSON.stringify({
+      pairingPackageImportedAt: "2026-06-28T10:02:00Z",
+      tailscaleIp: "100.90.10.11",
+    }),
   });
 
   await hydratePersistentMobileState(storage);
@@ -49,6 +55,7 @@ test("persistent mobile state hydrates remote credentials and failover settings"
   assert.equal(remoteEngineStore.getState().snapshot.connection.apiKey, "secret");
   assert.equal(remoteEngineStore.getState().snapshot.connection.transport, "tailscale");
   assert.equal(useSettingsState.getState().snapshot.failoverSettings.enginePriority, "remote_then_phone");
+  assert.equal(setupAutomationStore.getState().snapshot.windows.tailscaleIp, "100.90.10.11");
 });
 
 test("persistent mobile state can persist current store values and subscribe to changes", async () => {
@@ -61,18 +68,26 @@ test("persistent mobile state can persist current store values and subscribe to 
   useSettingsState.getState().updateFailoverSettings({
     enginePriority: "phone_then_remote",
   });
+  setupAutomationStore.getState().updateWindowsEvidence({
+    pairingPackageImportedAt: "2026-06-28T10:03:00Z",
+  });
   await persistPersistentMobileState(storage);
 
   assert.equal(JSON.parse(storage.values[REMOTE_CONNECTION_STORAGE_KEY]).baseApiUrl, "https://relay.example.com/api");
   assert.equal(JSON.parse(storage.values[FAILOVER_SETTINGS_STORAGE_KEY]).enginePriority, "phone_then_remote");
+  assert.equal(JSON.parse(storage.values[SETUP_AUTOMATION_STORAGE_KEY]).pairingPackageImportedAt, "2026-06-28T10:03:00Z");
 
   const unsubscribe = installPersistentMobileState(storage);
   remoteEngineStore.getState().updateConnectionDraft({
     baseApiUrl: "http://192.168.1.40:8001/api",
     apiKey: "local",
   });
+  setupAutomationStore.getState().updateWindowsEvidence({
+    tailscaleIp: "100.90.10.12",
+  });
   await Promise.resolve();
   unsubscribe();
 
   assert.equal(JSON.parse(storage.values[REMOTE_CONNECTION_STORAGE_KEY]).baseApiUrl, "http://192.168.1.40:8001/api");
+  assert.equal(JSON.parse(storage.values[SETUP_AUTOMATION_STORAGE_KEY]).tailscaleIp, "100.90.10.12");
 });
