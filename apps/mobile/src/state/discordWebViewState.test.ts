@@ -28,3 +28,16 @@ test("discord webview UI state exposes retryable load failures", () => {
   assert.equal(state.canRetry, true);
   assert.match(state.detailLabel, /net::ERR_FAILED/);
 });
+
+test("discord webview UI state keeps the webview mounted after a slow load timeout", () => {
+  const state = buildDiscordWebViewUiState(DEFAULT_DISCORD_INGESTION_SETTINGS, {
+    loading: false,
+    error: "",
+    timedOut: true,
+  });
+
+  assert.equal(state.renderWebView, true);
+  assert.equal(state.status, "slow");
+  assert.equal(state.canRetry, true);
+  assert.match(state.detailLabel, /taking longer/i);
+});

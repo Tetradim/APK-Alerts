@@ -3,11 +3,12 @@ import {
   type DiscordIngestionSettingsInput,
 } from "@apk-alerts/contracts";
 
-export type DiscordWebViewStatus = "disabled" | "loading" | "ready" | "error";
+export type DiscordWebViewStatus = "disabled" | "loading" | "slow" | "ready" | "error";
 
 export interface DiscordWebViewLoadState {
   loading: boolean;
   error: string;
+  timedOut?: boolean;
 }
 
 export interface DiscordWebViewUiState {
@@ -39,6 +40,16 @@ export function buildDiscordWebViewUiState(
       renderWebView: false,
       titleLabel: "Discord unavailable",
       detailLabel: loadState.error,
+      canRetry: true,
+    };
+  }
+
+  if (loadState.timedOut) {
+    return {
+      status: "slow",
+      renderWebView: true,
+      titleLabel: "Discord still loading",
+      detailLabel: "Discord is taking longer than usual to finish loading.",
       canRetry: true,
     };
   }

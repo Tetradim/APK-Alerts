@@ -13,13 +13,19 @@ const DISCORD_USER_AGENT =
 export default function DiscordTab() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const webRef = useRef<WebView>(null);
   const settings = useSettingsState((state) => state.snapshot.discordIngestionSettings);
-  const uiState = buildDiscordWebViewUiState(settings, { loading, error: loadError });
+  const uiState = buildDiscordWebViewUiState(settings, {
+    loading,
+    error: loadError,
+    timedOut: loadTimedOut,
+  });
 
   const reload = () => {
     setLoadError("");
+    setLoadTimedOut(false);
     setLoading(true);
     setReloadKey((current) => current + 1);
     webRef.current?.reload();
@@ -31,7 +37,7 @@ export default function DiscordTab() {
     }
 
     const timeoutId = setTimeout(() => {
-      setLoadError("Discord WebView load timed out.");
+      setLoadTimedOut(true);
       setLoading(false);
     }, 20_000);
 
@@ -81,14 +87,20 @@ export default function DiscordTab() {
         onLoadStart={() => {
           setLoading(true);
           setLoadError("");
+          setLoadTimedOut(false);
         }}
-        onLoadEnd={() => setLoading(false)}
+        onLoadEnd={() => {
+          setLoading(false);
+          setLoadTimedOut(false);
+        }}
         onError={(event) => {
           setLoading(false);
+          setLoadTimedOut(false);
           setLoadError(event.nativeEvent.description || "Discord WebView failed to load.");
         }}
         onHttpError={(event) => {
           setLoading(false);
+          setLoadTimedOut(false);
           setLoadError(`Discord returned HTTP ${event.nativeEvent.statusCode}.`);
         }}
         javaScriptEnabled
