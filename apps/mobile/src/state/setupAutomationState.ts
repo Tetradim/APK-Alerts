@@ -115,6 +115,7 @@ export interface SetupAutomationSnapshot {
   windows: WindowsSetupEvidence;
   lastImportError: string;
   lastImportedAt: string;
+  lastImportFormat: RemotePairingPackageInputFormat;
   lastSmokeRecordError: string;
 }
 
@@ -147,6 +148,7 @@ export function getDefaultSetupAutomationSnapshot(): SetupAutomationSnapshot {
     windows: getDefaultWindowsSetupEvidence(),
     lastImportError: "",
     lastImportedAt: "",
+    lastImportFormat: "unknown",
     lastSmokeRecordError: "",
   };
 }
@@ -213,6 +215,7 @@ export function createSetupAutomationStore(now: () => string = () => new Date().
           windows: result.ok ? result.evidence : state.snapshot.windows,
           lastImportError: result.error,
           lastImportedAt: result.ok ? result.evidence.pairingPackageImportedAt : state.snapshot.lastImportedAt,
+          lastImportFormat: result.inputFormat,
         },
       }));
       return result;

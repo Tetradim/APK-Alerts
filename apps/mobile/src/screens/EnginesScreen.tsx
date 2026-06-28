@@ -54,6 +54,10 @@ function adapterLabel(embedded: boolean, ready: boolean): string {
   return ready ? "ready" : "waiting for config";
 }
 
+function importFormatLabel(format: string): string {
+  return format === "deep_link" ? "deep link" : "JSON";
+}
+
 export function EnginesScreen() {
   const [phoneAction, setPhoneAction] = useState<"idle" | "refresh" | "start" | "stop">("idle");
   const [pairingPackageText, setPairingPackageText] = useState("");
@@ -65,11 +69,17 @@ export function EnginesScreen() {
   const updatePhoneRuntime = usePhoneEngineRuntimeState((state) => state.updateRuntime);
   const pairingSnapshot = usePairingDoctorState((state) => state.snapshot);
   const runPairingDoctor = usePairingDoctorState((state) => state.runDoctor);
+  const setupSnapshot = useSetupAutomationState((state) => state.snapshot);
   const importPairingPackage = useSetupAutomationState((state) => state.importPairingPackage);
   const summary = buildRemoteEngineSummary(snapshot);
   const phoneRuntime = buildPhoneEngineRuntimeSummary(phoneRuntimeSnapshot);
   const pairingSummary = buildPairingDoctorSummary(pairingSnapshot);
   const phoneBusy = phoneAction !== "idle";
+  const persistedPairingImportStatus = setupSnapshot.lastImportError
+    ? setupSnapshot.lastImportError
+    : setupSnapshot.lastImportedAt
+      ? `Imported ${setupSnapshot.lastImportedAt} via ${importFormatLabel(setupSnapshot.lastImportFormat)}`
+      : "";
 
   const runPhoneRuntimeAction = async (action: "refresh" | "start" | "stop") => {
     setPhoneAction(action);
@@ -96,9 +106,7 @@ export function EnginesScreen() {
     updateConnectionDraft(result.connection);
     setPairingPackageText("");
     setPairingImportStatus(
-      `Imported ${result.evidence.pairingPackageImportedAt} via ${
-        result.inputFormat === "deep_link" ? "deep link" : "JSON"
-      }`,
+      `Imported ${result.evidence.pairingPackageImportedAt} via ${importFormatLabel(result.inputFormat)}`,
     );
   };
 
@@ -181,9 +189,15 @@ export function EnginesScreen() {
           multiline
           style={[styles.input, styles.packageInput]}
         />
-        {pairingImportStatus ? (
-          <Text style={pairingImportStatus.startsWith("Imported") ? styles.success : styles.error}>
-            {pairingImportStatus}
+        {pairingImportStatus || persistedPairingImportStatus ? (
+          <Text
+            style={
+              (pairingImportStatus || persistedPairingImportStatus).startsWith("Imported")
+                ? styles.success
+                : styles.error
+            }
+          >
+            {pairingImportStatus || persistedPairingImportStatus}
           </Text>
         ) : null}
         <Pressable

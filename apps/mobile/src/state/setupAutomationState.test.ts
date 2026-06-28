@@ -290,12 +290,33 @@ test("setup automation store records valid pairing imports and preserves evidenc
   assert.equal(result.ok, true);
   assert.equal(store.getState().snapshot.windows.pairingPackageImportedAt, "2026-06-28T10:02:00Z");
   assert.equal(store.getState().snapshot.lastImportError, "");
+  assert.equal(store.getState().snapshot.lastImportFormat, "json");
 
   const failed = store.getState().importPairingPackage("not json");
 
   assert.equal(failed.ok, false);
   assert.equal(store.getState().snapshot.windows.pairingPackageImportedAt, "2026-06-28T10:02:00Z");
   assert.match(store.getState().snapshot.lastImportError, /valid JSON/);
+  assert.equal(store.getState().snapshot.lastImportFormat, "unknown");
+});
+
+test("setup automation store records deep link import format evidence", () => {
+  const store = createSetupAutomationStore(() => "2026-06-28T10:02:00Z");
+  const deepLink = buildRemotePairingDeepLink({
+    version: 1,
+    app: "mobile-consolidation",
+    createdAt: "2026-06-28T10:01:00Z",
+    remoteApiUrl: "http://100.90.10.11:8003/api",
+    apiKey: "mobile-secret",
+    transportHint: "tailscale",
+    requiredEndpoints: [],
+  });
+
+  const result = store.getState().importPairingPackage(deepLink);
+
+  assert.equal(result.ok, true);
+  assert.equal(store.getState().snapshot.lastImportFormat, "deep_link");
+  assert.equal(store.getState().snapshot.lastImportedAt, "2026-06-28T10:02:00Z");
 });
 
 test("setup smoke test fails closed until pairing health alert and peer evidence all pass", () => {

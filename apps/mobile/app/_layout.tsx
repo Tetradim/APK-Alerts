@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import * as Linking from "expo-linking";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -11,15 +12,19 @@ import {
   hydratePersistentMobileState,
   installPersistentMobileState,
 } from "@/state/persistentMobileState";
+import { installPairingDeepLinkHandler } from "@/state/pairingDeepLinkState";
 import { phoneEngineRuntimeStore } from "@/state/phoneEngineRuntimeState";
 import { installRemoteConnectionSync } from "@/state/remoteConnectionSync";
+import { remoteEngineStore } from "@/state/remoteEngineState";
 import { useSettingsState } from "@/state/settingsState";
+import { setupAutomationStore } from "@/state/setupAutomationState";
 
 export default function RootLayout() {
   useEffect(() => {
     let active = true;
     let phoneRuntimeInterval: ReturnType<typeof setInterval> | undefined;
     let unsubscribe: (() => void) | undefined;
+    let unsubscribePairingDeepLink: (() => void) | undefined;
     let unsubscribeNativeDiscordSettings: (() => void) | undefined;
     let unsubscribeRemoteConnectionSync: (() => void) | undefined;
 
@@ -43,6 +48,16 @@ export default function RootLayout() {
         }
         unsubscribe = installPersistentMobileState(expoSecureSettingsStorage);
         unsubscribeRemoteConnectionSync = installRemoteConnectionSync();
+        unsubscribePairingDeepLink = installPairingDeepLinkHandler(
+          {
+            getInitialURL: Linking.getInitialURL,
+            addEventListener: (_eventName, handler) => Linking.addEventListener("url", handler),
+          },
+          {
+            importPairingPackage: setupAutomationStore.getState().importPairingPackage,
+            updateConnectionDraft: remoteEngineStore.getState().updateConnectionDraft,
+          },
+        );
         const syncNativeDiscordSettings = () =>
           applyNativeDiscordIngestionSettings(
             phoneEngineRuntimeStore,
@@ -64,6 +79,7 @@ export default function RootLayout() {
         clearInterval(phoneRuntimeInterval);
       }
       unsubscribe?.();
+      unsubscribePairingDeepLink?.();
       unsubscribeNativeDiscordSettings?.();
       unsubscribeRemoteConnectionSync?.();
     };
