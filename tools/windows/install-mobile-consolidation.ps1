@@ -118,6 +118,63 @@ function Ensure-MobileFirewallRule {
     return $true
 }
 
+function Test-MobileApiPreflight {
+    param(
+        [int]$Port,
+        [string]$RemoteApiUrl,
+        [bool]$FirewallOpen
+    )
+
+    $ruleName = "Mobile Consolidation API $Port"
+    $repairCommand = "New-NetFirewallRule -DisplayName '$ruleName' -Direction Inbound -Action Allow -Protocol TCP -LocalPort $Port -Profile Private"
+    $rule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+    $healthUrl = "$RemoteApiUrl/health"
+    $httpStatus = 0
+    $localHealthOk = $false
+    $failureStage = ""
+    $repairHint = ""
+
+    if (-not $FirewallOpen -or -not $rule) {
+        $failureStage = "firewall_rule"
+        $repairHint = "Open inbound TCP $Port on the Private profile, then rerun Pairing Doctor from the phone."
+    }
+
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUrl -TimeoutSec 3
+        $httpStatus = [int]$response.StatusCode
+        $localHealthOk = $httpStatus -ge 200 -and $httpStatus -lt 300
+    } catch {
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+            $httpStatus = [int]$_.Exception.Response.StatusCode
+        }
+        $localHealthOk = $false
+    }
+
+    if (-not $localHealthOk -and -not $failureStage) {
+        $failureStage = "local_health"
+        $repairHint = "Start the Consolidation remote API on 0.0.0.0:$Port, then rerun Pairing Doctor from the phone."
+    }
+
+    if ($localHealthOk -and -not $failureStage) {
+        $failureStage = "phone_reachability"
+        $repairHint = "Import the pairing package on Android and run Pairing Doctor to prove phone reachability."
+    }
+
+    return [ordered]@{
+        checkedAt = (Get-Date).ToUniversalTime().ToString("o")
+        remoteApiUrl = $RemoteApiUrl
+        apiPort = $Port
+        firewallRuleName = $ruleName
+        firewallRulePresent = [bool]$rule
+        localHealthOk = $localHealthOk
+        phoneReachabilityOk = $false
+        httpStatus = $httpStatus
+        failureStage = $failureStage
+        repairHint = $repairHint
+        repairCommand = $repairCommand
+    }
+}
+
 function Write-RemoteEnvironment {
     param(
         [string]$RepoRoot,
@@ -163,6 +220,7 @@ function Write-SetupEvidence {
         [bool]$TailscaleInstalled,
         [hashtable]$TailscaleStatus,
         [bool]$FirewallOpen,
+        [object]$ApiPreflight,
         [string]$PairingPackagePath
     )
 
@@ -176,6 +234,7 @@ function Write-SetupEvidence {
         remoteApiBound = $true
         windowsFirewallOpen = $FirewallOpen
         apiReachableFromPhone = $false
+        apiPreflight = $ApiPreflight
         pairingPackageCreatedAt = (Get-Item -LiteralPath $PairingPackagePath).LastWriteTimeUtc.ToString("o")
         pairingPackageImportedAt = ""
         unattendedSmokeTestPassedAt = ""
@@ -197,6 +256,7 @@ $envPath = Write-RemoteEnvironment -RepoRoot $repoRoot -Port $ApiPort -ApiKey $M
 
 $remoteHost = if ($tailscaleStatus.ip) { $tailscaleStatus.ip } else { "127.0.0.1" }
 $remoteApiUrl = "http://$remoteHost`:$ApiPort/api"
+$apiPreflight = Test-MobileApiPreflight -Port $ApiPort -RemoteApiUrl $remoteApiUrl -FirewallOpen $firewallOpen
 $pairingPath = Write-PairingPackage -Root $InstallRoot -RemoteApiUrl $remoteApiUrl -ApiKey $MobileApiKey
 
 if (-not $EvidencePath) {
@@ -208,6 +268,7 @@ $setupEvidencePath = Write-SetupEvidence `
     -TailscaleInstalled $tailscaleInstalled `
     -TailscaleStatus $tailscaleStatus `
     -FirewallOpen $firewallOpen `
+    -ApiPreflight $apiPreflight `
     -PairingPackagePath $pairingPath
 
 Write-Host "Consolidation repo: $repoRoot"

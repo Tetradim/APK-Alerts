@@ -37,9 +37,32 @@ export interface WindowsSetupEvidence {
   remoteApiBound: boolean;
   windowsFirewallOpen: boolean;
   apiReachableFromPhone: boolean;
+  apiPreflight: WindowsApiPreflightEvidence;
   pairingPackageCreatedAt: string;
   pairingPackageImportedAt: string;
   unattendedSmokeTestPassedAt: string;
+}
+
+export interface WindowsApiPreflightEvidence {
+  checkedAt: string;
+  remoteApiUrl: string;
+  apiPort: number;
+  firewallRuleName: string;
+  firewallRulePresent: boolean;
+  localHealthOk: boolean;
+  phoneReachabilityOk: boolean;
+  httpStatus: number;
+  failureStage: string;
+  repairHint: string;
+  repairCommand: string;
+}
+
+export interface WindowsApiPreflightSummary {
+  statusLabel: string;
+  checkedAtLabel: string;
+  detailLabel: string;
+  repairLabel: string;
+  blocking: boolean;
 }
 
 export interface SetupAutomationInput {
@@ -128,9 +151,26 @@ export function getDefaultWindowsSetupEvidence(): WindowsSetupEvidence {
     remoteApiBound: false,
     windowsFirewallOpen: false,
     apiReachableFromPhone: false,
+    apiPreflight: getDefaultWindowsApiPreflightEvidence(),
     pairingPackageCreatedAt: "",
     pairingPackageImportedAt: "",
     unattendedSmokeTestPassedAt: "",
+  };
+}
+
+export function getDefaultWindowsApiPreflightEvidence(): WindowsApiPreflightEvidence {
+  return {
+    checkedAt: "",
+    remoteApiUrl: "",
+    apiPort: 0,
+    firewallRuleName: "",
+    firewallRulePresent: false,
+    localHealthOk: false,
+    phoneReachabilityOk: false,
+    httpStatus: 0,
+    failureStage: "",
+    repairHint: "",
+    repairCommand: "",
   };
 }
 
@@ -223,8 +263,48 @@ export function importMobilePairingPackage(
       pairingPackageCreatedAt: config.createdAt || currentEvidence.pairingPackageCreatedAt,
       pairingPackageImportedAt: importedAt,
       tailscaleIp: extractTailscaleIp(remoteApiUrl) || currentEvidence.tailscaleIp,
+      apiPreflight: {
+        ...currentEvidence.apiPreflight,
+        remoteApiUrl,
+        apiPort: extractPort(remoteApiUrl) || currentEvidence.apiPreflight.apiPort,
+      },
     },
     error: "",
+  };
+}
+
+export function buildWindowsApiPreflightSummary(
+  evidence: WindowsSetupEvidence,
+): WindowsApiPreflightSummary {
+  const preflight = evidence.apiPreflight;
+  if (!preflight.checkedAt) {
+    return {
+      statusLabel: "Not checked",
+      checkedAtLabel: "Not checked",
+      detailLabel: "Run the Windows installer preflight for firewall and API diagnostics.",
+      repairLabel: "Run tools/windows/install-mobile-consolidation.ps1 on the remote Windows computer.",
+      blocking: true,
+    };
+  }
+
+  const firewallReady = evidence.windowsFirewallOpen && preflight.firewallRulePresent;
+  const phoneReachabilityReady = evidence.apiReachableFromPhone || preflight.phoneReachabilityOk;
+  const blocking = !(firewallReady && preflight.localHealthOk && phoneReachabilityReady);
+  const stage = preflight.failureStage || (blocking ? "phone_reachability" : "clear");
+  const statusLabel = blocking ? "Blocked" : "Passed";
+  const httpLabel = preflight.httpStatus > 0 ? `HTTP ${preflight.httpStatus}` : "No HTTP response";
+  const targetLabel = preflight.remoteApiUrl || "remote API URL missing";
+  const repairLabel =
+    preflight.failureStage === "firewall_rule" && preflight.repairCommand
+      ? preflight.repairCommand
+      : preflight.repairHint || preflight.repairCommand || "Rerun Windows setup preflight.";
+
+  return {
+    statusLabel,
+    checkedAtLabel: `Checked ${preflight.checkedAt}`,
+    detailLabel: `${targetLabel}; port ${preflight.apiPort || "unknown"}; ${httpLabel}; stage ${stage}`,
+    repairLabel,
+    blocking,
   };
 }
 
@@ -232,9 +312,12 @@ export function buildSetupAutomationSummary(
   input: SetupAutomationInput,
 ): SetupAutomationSummary {
   const pairingSummary = buildPairingDoctorSummary(input.pairing);
+  const apiPreflightSummary = buildWindowsApiPreflightSummary(input.windows);
   const webViewSummary = buildDiscordWebViewHealthSummary(input.webView);
   const remoteConfigured = Boolean(input.remote.connection.baseApiUrl);
   const tailscaleAddress = input.windows.tailscaleMagicDnsName || input.windows.tailscaleIp;
+  const phoneReachabilityProven =
+    input.windows.apiReachableFromPhone || (Boolean(input.pairing.status) && !pairingSummary.blocking);
   const phoneServiceHealthy =
     input.phoneRuntime.nativeRuntimeAvailable &&
     input.phoneRuntime.serviceEnabled &&
@@ -291,11 +374,13 @@ export function buildSetupAutomationSummary(
     createItem({
       key: "firewall_reachability",
       label: "Firewall and reachability",
-      ready: input.windows.windowsFirewallOpen && input.windows.apiReachableFromPhone,
+      ready: input.windows.windowsFirewallOpen && phoneReachabilityProven,
       readyStatus: "Reachable",
       blockedStatus: "Blocked",
-      readyDetail: "Windows firewall and phone reachability checks passed.",
-      blockedDetail: "Open the API port and verify the phone can reach the remote URL.",
+      readyDetail: input.windows.apiReachableFromPhone
+        ? "Windows firewall and phone reachability checks passed."
+        : `Pairing Doctor passed from phone ${input.pairing.lastCheckedAt || "recently"}. ${apiPreflightSummary.detailLabel}`,
+      blockedDetail: `${apiPreflightSummary.detailLabel}. ${apiPreflightSummary.repairLabel}`,
       actionLabel: "Repair Windows firewall",
     }),
     createItem({
@@ -501,6 +586,19 @@ function extractTailscaleIp(remoteApiUrl: string): string {
     return "";
   } catch {
     return "";
+  }
+}
+
+function extractPort(remoteApiUrl: string): number {
+  try {
+    const url = new URL(remoteApiUrl);
+    const explicit = Number(url.port);
+    if (Number.isInteger(explicit) && explicit > 0) {
+      return explicit;
+    }
+    return url.protocol === "https:" ? 443 : 80;
+  } catch {
+    return 0;
   }
 }
 

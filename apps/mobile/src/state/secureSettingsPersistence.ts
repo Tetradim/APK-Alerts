@@ -104,14 +104,42 @@ function normalizeSetupEvidence(payload: Record<string, unknown> | WindowsSetupE
     remoteApiBound: payload.remoteApiBound === true,
     windowsFirewallOpen: payload.windowsFirewallOpen === true,
     apiReachableFromPhone: payload.apiReachableFromPhone === true,
+    apiPreflight: normalizeApiPreflight(payload.apiPreflight, defaults.apiPreflight),
     pairingPackageCreatedAt: cleanString(payload.pairingPackageCreatedAt) || defaults.pairingPackageCreatedAt,
     pairingPackageImportedAt: cleanString(payload.pairingPackageImportedAt) || defaults.pairingPackageImportedAt,
     unattendedSmokeTestPassedAt: cleanString(payload.unattendedSmokeTestPassedAt) || defaults.unattendedSmokeTestPassedAt,
   };
 }
 
+function normalizeApiPreflight(
+  payload: unknown,
+  defaults: WindowsSetupEvidence["apiPreflight"],
+): WindowsSetupEvidence["apiPreflight"] {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    return defaults;
+  }
+  const record = payload as Record<string, unknown>;
+  return {
+    checkedAt: cleanString(record.checkedAt) || defaults.checkedAt,
+    remoteApiUrl: cleanString(record.remoteApiUrl) || defaults.remoteApiUrl,
+    apiPort: cleanInteger(record.apiPort) || defaults.apiPort,
+    firewallRuleName: cleanString(record.firewallRuleName) || defaults.firewallRuleName,
+    firewallRulePresent: record.firewallRulePresent === true,
+    localHealthOk: record.localHealthOk === true,
+    phoneReachabilityOk: record.phoneReachabilityOk === true,
+    httpStatus: cleanInteger(record.httpStatus) || defaults.httpStatus,
+    failureStage: cleanString(record.failureStage) || defaults.failureStage,
+    repairHint: cleanString(record.repairHint) || defaults.repairHint,
+    repairCommand: cleanString(record.repairCommand) || defaults.repairCommand,
+  };
+}
+
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanInteger(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
 export async function loadFailoverSettings(

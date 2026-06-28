@@ -8,6 +8,7 @@ import { getDefaultRemoteEngineSnapshot } from "./remoteEngineState.js";
 import { getDefaultAlertEvidenceSnapshot } from "./alertEvidenceState.js";
 import { getDefaultPeerAlertFailsafeSnapshot } from "./peerAlertFailsafeState.js";
 import {
+  buildWindowsApiPreflightSummary,
   buildSetupSmokeTestSummary,
   buildSetupAutomationSummary,
   createSetupAutomationStore,
@@ -50,9 +51,107 @@ test("setup automation keeps tailscale blockers explicit after installer starts"
   assert.equal(summary.nextActionLabel, "Install Tailscale");
 });
 
+test("windows api preflight surfaces concrete repair instructions", () => {
+  const evidence = getDefaultWindowsSetupEvidence();
+  evidence.apiPreflight = {
+    checkedAt: "2026-06-28T10:01:30Z",
+    remoteApiUrl: "http://100.90.10.11:8003/api",
+    apiPort: 8003,
+    firewallRuleName: "Mobile Consolidation API 8003",
+    firewallRulePresent: false,
+    localHealthOk: false,
+    phoneReachabilityOk: false,
+    httpStatus: 0,
+    failureStage: "firewall_rule",
+    repairHint: "Open inbound TCP 8003 on the Private profile, then rerun Pairing Doctor.",
+    repairCommand: "New-NetFirewallRule -DisplayName 'Mobile Consolidation API 8003' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8003 -Profile Private",
+  };
+
+  const summary = buildWindowsApiPreflightSummary(evidence);
+
+  assert.equal(summary.statusLabel, "Blocked");
+  assert.equal(summary.checkedAtLabel, "Checked 2026-06-28T10:01:30Z");
+  assert.match(summary.detailLabel, /firewall_rule/);
+  assert.match(summary.repairLabel, /New-NetFirewallRule/);
+  assert.equal(summary.blocking, true);
+});
+
+test("windows api preflight prioritizes API health repair hints after firewall passes", () => {
+  const evidence = getDefaultWindowsSetupEvidence();
+  evidence.windowsFirewallOpen = true;
+  evidence.apiPreflight = {
+    checkedAt: "2026-06-28T10:01:30Z",
+    remoteApiUrl: "http://100.90.10.11:8003/api",
+    apiPort: 8003,
+    firewallRuleName: "Mobile Consolidation API 8003",
+    firewallRulePresent: true,
+    localHealthOk: false,
+    phoneReachabilityOk: false,
+    httpStatus: 0,
+    failureStage: "local_health",
+    repairHint: "Start the Consolidation remote API on 0.0.0.0:8003, then rerun Pairing Doctor from the phone.",
+    repairCommand: "New-NetFirewallRule -DisplayName 'Mobile Consolidation API 8003' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8003 -Profile Private",
+  };
+
+  const summary = buildWindowsApiPreflightSummary(evidence);
+
+  assert.match(summary.repairLabel, /Start the Consolidation remote API/);
+  assert.doesNotMatch(summary.repairLabel, /New-NetFirewallRule/);
+});
+
+test("setup automation accepts passing Pairing Doctor as phone reachability proof", () => {
+  const input = buildDefaultInput();
+  input.windows.installerRanAt = "2026-06-28T10:00:00Z";
+  input.windows.consolidationRepoReady = true;
+  input.windows.tailscaleInstalled = true;
+  input.windows.tailscaleLoggedIn = true;
+  input.windows.tailscaleIp = "100.90.10.11";
+  input.windows.remoteApiBound = true;
+  input.windows.windowsFirewallOpen = true;
+  input.windows.apiReachableFromPhone = false;
+  input.windows.apiPreflight = {
+    checkedAt: "2026-06-28T10:01:30Z",
+    remoteApiUrl: "http://100.90.10.11:8003/api",
+    apiPort: 8003,
+    firewallRuleName: "Mobile Consolidation API 8003",
+    firewallRulePresent: true,
+    localHealthOk: true,
+    phoneReachabilityOk: false,
+    httpStatus: 200,
+    failureStage: "",
+    repairHint: "",
+    repairCommand: "",
+  };
+  input.remote.connection = {
+    baseApiUrl: "http://100.90.10.11:8003/api",
+    apiKey: "redacted",
+    transport: "tailscale",
+  };
+  input.pairing.lastCheckedAt = "2026-06-28T10:02:50Z";
+  input.pairing.status = {
+    version: 1,
+    serverTime: "2026-06-28T10:02:50Z",
+    apiAuthConfigured: true,
+    apiKeyRequired: true,
+    remoteBind: { host: "0.0.0.0", port: 8003, remoteAccessible: true },
+    chromeBridgeRemoteEnabled: true,
+    baseApiUrlHint: "http://100.90.10.11:8003/api",
+    requiredEndpoints: [],
+    blockingIssues: [],
+  };
+
+  const summary = buildSetupAutomationSummary(input);
+  const reachability = summary.items.find((item) => item.key === "firewall_reachability");
+
+  assert.equal(reachability?.blocking, false);
+  assert.equal(reachability?.statusLabel, "Reachable");
+  assert.match(reachability?.detailLabel ?? "", /Pairing Doctor passed/);
+});
+
 test("setup automation clears only with remote phone pairing health and smoke evidence", () => {
   const input = buildDefaultInput();
   input.windows = {
+    ...getDefaultWindowsSetupEvidence(),
     installerRanAt: "2026-06-28T10:00:00Z",
     consolidationRepoReady: true,
     tailscaleInstalled: true,
