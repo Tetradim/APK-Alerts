@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeLiveReadinessPayload } from "@apk-alerts/contracts";
 import {
+  buildExitProtectionAuditDigest,
   buildExitProtectionEvidenceSummary,
   buildLiveArmChecklistSummary,
   buildReplayAcceptanceEvidenceSummary,
@@ -274,6 +275,48 @@ test("exit protection evidence treats default empty readiness as blocking", () =
   assert.equal(summary.unprotectedPositionsLabel, "Unprotected positions: none");
   assert.equal(summary.metadataOnlyPositionsLabel, "Metadata-only positions: none");
   assert.equal(summary.blocking, true);
+});
+
+test("exit protection audit digest records blocking OCO evidence without raw position detail", () => {
+  const blockedPayload = {
+    ...readyPayload,
+    ready_for_live: false,
+    blocking_issues: [{ code: "oco_exit_protection_missing", message: "Open positions are missing OCO exits." }],
+    blocking_codes: ["oco_exit_protection_missing"],
+    checks: {
+      ...readyPayload.checks,
+      exit_automation: {
+        ...readyPayload.checks.exit_automation,
+        oco_exits_configured: false,
+        broker_cancel_supported: false,
+        unprotected_open_position_count: 2,
+        unprotected_open_position_ids: ["pos-1", "pos-2"],
+        metadata_only_open_position_count: 1,
+        metadata_only_open_position_ids: ["pos-3"],
+      },
+    },
+  };
+  const digest = buildExitProtectionAuditDigest({
+    ...getDefaultLiveReadinessSnapshot(),
+    remote: readinessSnapshot(blockedPayload),
+  });
+
+  assert.equal(digest.checkedAt, "2026-06-27T17:25:00.000Z");
+  assert.equal(digest.statusLabel, "OCO exits blocking");
+  assert.equal(digest.gateLabel, "Blocks live");
+  assert.equal(digest.configurationLabel, "OCO exits missing");
+  assert.equal(digest.capabilityLabel, "Broker exit automation capabilities missing");
+  assert.equal(digest.unprotectedOpenPositionCount, 2);
+  assert.deepEqual(digest.unprotectedOpenPositionIds, ["pos-1", "pos-2"]);
+  assert.equal(digest.metadataOnlyOpenPositionCount, 1);
+  assert.deepEqual(digest.metadataOnlyOpenPositionIds, ["pos-3"]);
+  assert.deepEqual(digest.blockingLabels, [
+    "OCO exits missing",
+    "Broker exit automation capabilities missing",
+    "Unprotected positions: pos-1, pos-2",
+    "Metadata-only positions: pos-3",
+  ]);
+  assert.equal(digest.blocking, true);
 });
 
 test("live arm checklist clears only when every endpoint and runtime gate passes", () => {

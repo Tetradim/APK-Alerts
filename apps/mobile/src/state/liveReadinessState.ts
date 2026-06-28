@@ -66,6 +66,20 @@ export interface ExitProtectionEvidenceSummary {
   blocking: boolean;
 }
 
+export interface ExitProtectionAuditDigest {
+  checkedAt: string;
+  statusLabel: string;
+  gateLabel: string;
+  configurationLabel: string;
+  capabilityLabel: string;
+  unprotectedOpenPositionCount: number;
+  unprotectedOpenPositionIds: string[];
+  metadataOnlyOpenPositionCount: number;
+  metadataOnlyOpenPositionIds: string[];
+  blockingLabels: string[];
+  blocking: boolean;
+}
+
 export interface LiveArmChecklistItem {
   key: string;
   label: string;
@@ -210,6 +224,41 @@ export function buildExitProtectionEvidenceSummary(
       exits.metadataOnlyOpenPositionCount,
     ),
     blocking: !protectedByOco,
+  };
+}
+
+export function buildExitProtectionAuditDigest(
+  snapshot: LiveReadinessSnapshot,
+): ExitProtectionAuditDigest {
+  const exits = snapshot.remote.readiness.checks.exitAutomation;
+  const summary = buildExitProtectionEvidenceSummary(snapshot);
+  const hasBrokerExitCapabilities = exits.brokerOrderStatusSupported && exits.brokerCancelSupported;
+  const hasUnprotectedPositions =
+    exits.unprotectedOpenPositionCount > 0 ||
+    exits.unprotectedOpenPositionIds.length > 0;
+  const hasMetadataOnlyPositions =
+    exits.metadataOnlyOpenPositionCount > 0 ||
+    exits.metadataOnlyOpenPositionIds.length > 0;
+  const blockingLabels = [
+    snapshot.remote.checkedAt ? "" : "Live-readiness evidence missing",
+    exits.ocoExitsConfigured ? "" : summary.configurationLabel,
+    hasBrokerExitCapabilities ? "" : summary.capabilityLabel,
+    hasUnprotectedPositions ? summary.unprotectedPositionsLabel : "",
+    hasMetadataOnlyPositions ? summary.metadataOnlyPositionsLabel : "",
+  ].filter((label) => label.length > 0);
+
+  return {
+    checkedAt: snapshot.remote.checkedAt,
+    statusLabel: summary.statusLabel,
+    gateLabel: summary.gateLabel,
+    configurationLabel: summary.configurationLabel,
+    capabilityLabel: summary.capabilityLabel,
+    unprotectedOpenPositionCount: exits.unprotectedOpenPositionCount,
+    unprotectedOpenPositionIds: [...exits.unprotectedOpenPositionIds],
+    metadataOnlyOpenPositionCount: exits.metadataOnlyOpenPositionCount,
+    metadataOnlyOpenPositionIds: [...exits.metadataOnlyOpenPositionIds],
+    blockingLabels,
+    blocking: summary.blocking,
   };
 }
 

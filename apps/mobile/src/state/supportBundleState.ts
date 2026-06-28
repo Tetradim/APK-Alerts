@@ -8,7 +8,11 @@ import {
   buildDiscordWebViewHealthSummary,
   type DiscordWebViewHealthSnapshot,
 } from "./discordWebViewState";
-import type { LiveReadinessSnapshot } from "./liveReadinessState";
+import {
+  buildExitProtectionAuditDigest,
+  type ExitProtectionAuditDigest,
+  type LiveReadinessSnapshot,
+} from "./liveReadinessState";
 import {
   buildPairingDoctorSummary,
   type PairingDoctorSnapshot,
@@ -93,6 +97,7 @@ export interface MobileSupportBundle {
     readyForLive: boolean;
     liveMoneyReady: boolean;
     blockingCodes: string[];
+    exitProtectionDigest: ExitProtectionAuditDigest;
   };
   alertEvidence: {
     checkedAt: string;
@@ -278,6 +283,7 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
       readyForLive: input.liveReadiness.remote.readiness.readyForLive,
       liveMoneyReady: input.liveReadiness.remote.liveMoneyReady,
       blockingCodes: input.liveReadiness.remote.readiness.blockingCodes,
+      exitProtectionDigest: buildExitProtectionAuditDigest(input.liveReadiness),
     },
     alertEvidence: {
       checkedAt: input.alertEvidence.evidence.checkedAt,

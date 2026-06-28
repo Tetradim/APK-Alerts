@@ -3,7 +3,11 @@ import { buildActionButtonAccessibility } from "@/components/actionButtonAccessi
 import { MetricTile } from "@/components/MetricTile";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { StatusPill } from "@/components/StatusPill";
-import { buildExitProtectionEvidenceSummary, useLiveReadinessState } from "@/state/liveReadinessState";
+import {
+  buildExitProtectionAuditDigest,
+  buildExitProtectionEvidenceSummary,
+  useLiveReadinessState,
+} from "@/state/liveReadinessState";
 import {
   buildReconciliationAuditDigest,
   buildOrderLifecycleEvidenceSummary,
@@ -32,6 +36,7 @@ export function PositionsScreen() {
   const checkLiveReadiness = useLiveReadinessState((state) => state.checkReadiness);
   const summary = buildReconciliationSummary(reconciliationSnapshot);
   const exitProtection = buildExitProtectionEvidenceSummary(liveReadinessSnapshot);
+  const exitProtectionDigest = buildExitProtectionAuditDigest(liveReadinessSnapshot);
   const exitLastCheckLabel = liveReadinessSnapshot.remote.checkedAt
     ? `Checked ${liveReadinessSnapshot.remote.checkedAt}`
     : "Never checked";
@@ -86,6 +91,11 @@ export function PositionsScreen() {
         <Text style={styles.detail}>{exitProtection.capabilityLabel}</Text>
         <Text style={styles.detail}>{exitProtection.unprotectedPositionsLabel}</Text>
         <Text style={styles.detail}>{exitProtection.metadataOnlyPositionsLabel}</Text>
+        <Text style={styles.auditText}>
+          Digest {exitProtectionDigest.gateLabel} - unprotected{" "}
+          {exitProtectionDigest.unprotectedOpenPositionCount} - metadata-only{" "}
+          {exitProtectionDigest.metadataOnlyOpenPositionCount}
+        </Text>
         <View style={styles.panelFooter}>
           <Text style={[styles.detail, styles.footerDetail]}>{exitLastCheckLabel}</Text>
           <Pressable

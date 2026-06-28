@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildAlertEvidenceChains,
   CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
   normalizeBridgeAlertDecisionEvent,
+  normalizeLiveReadinessPayload,
   normalizeReconciliationPayload,
-  buildAlertEvidenceChains,
 } from "@apk-alerts/contracts";
 import {
   buildSetupHealthReportSummary,
@@ -349,4 +350,41 @@ test("mobile support bundle includes reconciliation audit digests", () => {
   assert.equal(bundle.reconciliation.latestDigest?.lifecycleGateLabel, "Lifecycle clear");
   assert.equal(bundle.reconciliation.latestDigest?.blocking, false);
   assert.equal(bundle.reconciliation.digests.length, 1);
+});
+
+test("mobile support bundle includes exit protection audit digest", () => {
+  const input = buildDefaultSupportInput();
+  input.remote.connection.apiKey = "mobile-api-key";
+  input.liveReadiness.remote = {
+    checkedAt: "2026-06-28T12:15:00Z",
+    liveMoneyReady: false,
+    readiness: normalizeLiveReadinessPayload({
+      ready_for_live: false,
+      blocking_issues: [{ code: "oco_exit_protection_missing", message: "Open positions are missing OCO exits." }],
+      blocking_codes: ["oco_exit_protection_missing"],
+      checks: {
+        exit_automation: {
+          oco_exits_configured: false,
+          broker_order_status_supported: true,
+          broker_cancel_supported: false,
+          unprotected_open_position_count: 1,
+          unprotected_open_position_ids: ["position-support-1"],
+          metadata_only_open_position_count: 0,
+        },
+      },
+    }),
+  };
+
+  const bundle = buildMobileSupportBundle(input);
+  const serialized = serializeMobileSupportBundle(bundle);
+
+  assert.equal(bundle.liveReadiness.exitProtectionDigest.checkedAt, "2026-06-28T12:15:00Z");
+  assert.equal(bundle.liveReadiness.exitProtectionDigest.gateLabel, "Blocks live");
+  assert.equal(bundle.liveReadiness.exitProtectionDigest.unprotectedOpenPositionCount, 1);
+  assert.deepEqual(bundle.liveReadiness.exitProtectionDigest.blockingLabels, [
+    "OCO exits missing",
+    "Broker exit automation capabilities missing",
+    "Unprotected positions: position-support-1",
+  ]);
+  assert.doesNotMatch(serialized, /mobile-api-key/);
 });
