@@ -213,6 +213,10 @@ export type CreateEventInput<TType extends TradingEventType = TradingEventType> 
 export function createEvent<TInput extends CreateEventInput>(
   input: TInput,
 ): BaseEvent<TInput["type"], TInput["payload"]> {
+  if (!Number.isInteger(input.sequence) || input.sequence < 0) {
+    throw new Error("Event sequence must be a non-negative integer.");
+  }
+
   return {
     id: input.id,
     type: input.type,
