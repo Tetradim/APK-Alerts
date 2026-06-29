@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
@@ -8,8 +7,6 @@ import {
   normalizeBridgeHealthPayload,
   normalizeBridgeSignalEvent,
 } from "./bridgeEvidence";
-
-const bridgeEvidenceSource = readFileSync(new URL("./bridgeEvidence.ts", import.meta.url), "utf8");
 
 const signalEvent = {
   version: "bot-event.v1",
@@ -176,11 +173,38 @@ test("skipped low-confidence audit preserves source policy proof", () => {
   assert.equal(lowConfidenceDecision.decision.skipReason, "parser confidence low below required medium");
 });
 
-test("bridge source policy count normalizer accepts explicit zero counts", () => {
-  assert.match(
-    bridgeEvidenceSource,
-    /function nonNegativeInteger\(input: unknown\): number \{\s+return typeof input === "number" && Number\.isInteger\(input\) && input >= 0 \? input : 0;\s+\}/,
-  );
+test("bridge source policy count proof distinguishes explicit zero from missing counts", () => {
+  const zeroCountDecision = normalizeBridgeAlertDecisionEvent({
+    ...auditEvent,
+    details: {
+      ...auditEvent.details,
+      source: {
+        ...auditEvent.details.source,
+        allowed_channel_url_count: 0,
+        allowed_author_id_count: 0,
+      },
+    },
+  });
+  const missingCountDecision = normalizeBridgeAlertDecisionEvent({
+    ...auditEvent,
+    details: {
+      ...auditEvent.details,
+      source: {
+        ...auditEvent.details.source,
+        allowed_channel_url_count: undefined,
+        allowed_author_id_count: undefined,
+      },
+    },
+  });
+
+  assert.equal(zeroCountDecision.source.allowedChannelUrlCount, 0);
+  assert.equal(zeroCountDecision.source.allowedChannelUrlCountProvided, true);
+  assert.equal(zeroCountDecision.source.allowedAuthorIdCount, 0);
+  assert.equal(zeroCountDecision.source.allowedAuthorIdCountProvided, true);
+  assert.equal(missingCountDecision.source.allowedChannelUrlCount, 0);
+  assert.equal(missingCountDecision.source.allowedChannelUrlCountProvided, false);
+  assert.equal(missingCountDecision.source.allowedAuthorIdCount, 0);
+  assert.equal(missingCountDecision.source.allowedAuthorIdCountProvided, false);
 });
 
 test("malformed bridge evidence normalizes to empty fail-closed values", () => {

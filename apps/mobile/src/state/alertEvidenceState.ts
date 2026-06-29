@@ -620,9 +620,9 @@ export function buildSourcePolicySummary(chain: AlertEvidenceChain | null | unde
     source.observedParserConfidence !== "none" &&
     source.minParserConfidence !== "none" &&
     source.channelUrlAllowed &&
-    source.allowedChannelUrlCount > 0 &&
+    source.allowedChannelUrlCountProvided &&
     source.authorIdAllowed &&
-    source.allowedAuthorIdCount > 0 &&
+    source.allowedAuthorIdCountProvided &&
     source.metadataPolicyPassed;
 
   return {
@@ -634,8 +634,18 @@ export function buildSourcePolicySummary(chain: AlertEvidenceChain | null | unde
       source.minParserConfidence,
       source.parserConfidenceAllowed,
     ),
-    channelLabel: formatPolicyAllowlistLabel("Channel", source.channelUrlAllowed, source.allowedChannelUrlCount),
-    authorLabel: formatPolicyAllowlistLabel("Author", source.authorIdAllowed, source.allowedAuthorIdCount),
+    channelLabel: formatPolicyAllowlistLabel(
+      "Channel",
+      source.channelUrlAllowed,
+      source.allowedChannelUrlCount,
+      source.allowedChannelUrlCountProvided,
+    ),
+    authorLabel: formatPolicyAllowlistLabel(
+      "Author",
+      source.authorIdAllowed,
+      source.allowedAuthorIdCount,
+      source.allowedAuthorIdCountProvided,
+    ),
     executionModeLabel: formatSourceExecutionModeLabel(source.paperOnly, source.requireManualConfirm),
     blocking: !passed,
   };
@@ -953,9 +963,19 @@ function formatParserPolicyLabel(observed: string, minimum: string, allowed: boo
     : `Parser ${observedLabel} below ${minimumLabel}`;
 }
 
-function formatPolicyAllowlistLabel(label: "Channel" | "Author", allowed: boolean, count: number): string {
-  if (count <= 0) {
+function formatPolicyAllowlistLabel(
+  label: "Channel" | "Author",
+  allowed: boolean,
+  count: number,
+  countProvided: boolean,
+): string {
+  if (!countProvided) {
     return `${label} allowlist proof missing`;
+  }
+  if (count === 0) {
+    return allowed
+      ? `${label} allowed (all permitted)`
+      : `${label} blocked (no explicit allowlist entries)`;
   }
   return `${label} ${allowed ? "allowed" : "blocked"} (${count} ${count === 1 ? "allowlist entry" : "allowlist entries"})`;
 }

@@ -49,8 +49,10 @@ export interface BridgeSourcePolicyProof {
   observedParserConfidence: ParserConfidence;
   parserConfidenceAllowed: boolean;
   allowedChannelUrlCount: number;
+  allowedChannelUrlCountProvided: boolean;
   channelUrlAllowed: boolean;
   allowedAuthorIdCount: number;
+  allowedAuthorIdCountProvided: boolean;
   authorIdAllowed: boolean;
   metadataPolicyPassed: boolean;
 }
@@ -315,6 +317,8 @@ function normalizeIngestionResult(input: unknown, fallbackStatus: BridgeEvidence
 
 function normalizeSourcePolicyProof(input: unknown): BridgeSourcePolicyProof {
   const source = asRecord(input);
+  const allowedChannelUrlCount = nonNegativeIntegerOrNull(source.allowed_channel_url_count);
+  const allowedAuthorIdCount = nonNegativeIntegerOrNull(source.allowed_author_id_count);
   return {
     key: text(source.key),
     name: text(source.name),
@@ -324,9 +328,11 @@ function normalizeSourcePolicyProof(input: unknown): BridgeSourcePolicyProof {
     minParserConfidence: normalizeParserConfidence(source.min_parser_confidence),
     observedParserConfidence: normalizeParserConfidence(source.observed_parser_confidence),
     parserConfidenceAllowed: exactBoolean(source.parser_confidence_allowed),
-    allowedChannelUrlCount: nonNegativeInteger(source.allowed_channel_url_count),
+    allowedChannelUrlCount: allowedChannelUrlCount ?? 0,
+    allowedChannelUrlCountProvided: allowedChannelUrlCount !== null,
     channelUrlAllowed: exactBoolean(source.channel_url_allowed),
-    allowedAuthorIdCount: nonNegativeInteger(source.allowed_author_id_count),
+    allowedAuthorIdCount: allowedAuthorIdCount ?? 0,
+    allowedAuthorIdCountProvided: allowedAuthorIdCount !== null,
     authorIdAllowed: exactBoolean(source.author_id_allowed),
     metadataPolicyPassed: exactBoolean(source.metadata_policy_passed),
   };
@@ -463,10 +469,6 @@ function stringArray(input: unknown): string[] {
 
 function finiteNumberOrNull(input: unknown): number | null {
   return typeof input === "number" && Number.isFinite(input) ? input : null;
-}
-
-function nonNegativeInteger(input: unknown): number {
-  return typeof input === "number" && Number.isInteger(input) && input >= 0 ? input : 0;
 }
 
 function nonNegativeIntegerOrNull(input: unknown): number | null {

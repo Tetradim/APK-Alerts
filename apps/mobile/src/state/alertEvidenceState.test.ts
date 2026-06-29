@@ -431,6 +431,56 @@ test("source policy summary exposes strict passing source, channel, author, and 
   assert.equal(summary.blocking, false);
 });
 
+test("source policy summary treats explicit zero allowlist counts as all permitted", () => {
+  const allPermittedDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-source-all-permitted",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-1",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        paper_only: false,
+        require_manual_confirm: false,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: 0,
+        channel_url_allowed: true,
+        allowed_author_id_count: 0,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-1",
+        trade_requested: false,
+        trade_request_reason: "auto trading disabled",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [allPermittedDecision] })[0];
+  const summary = buildSourcePolicySummary(chain);
+
+  assert.equal(summary.statusLabel, "Source policy passed");
+  assert.equal(summary.gateLabel, "Source gate clear");
+  assert.equal(summary.channelLabel, "Channel allowed (all permitted)");
+  assert.equal(summary.authorLabel, "Author allowed (all permitted)");
+  assert.equal(summary.blocking, false);
+});
+
 test("source policy summary exposes blocked parser, channel, and author proof", () => {
   const blockedDecision = normalizeBridgeAlertDecisionEvent({
     id: "audit-source-blocked",
@@ -525,6 +575,56 @@ test("source policy summary blocks allowed flags without parser and allowlist pr
   assert.equal(summary.gateLabel, "Blocks alert");
   assert.equal(summary.sourceLabel, "Chrome Alerts (chrome-alerts) - override matched");
   assert.equal(summary.confidenceLabel, "Parser proof missing");
+  assert.equal(summary.channelLabel, "Channel allowlist proof missing");
+  assert.equal(summary.authorLabel, "Author allowlist proof missing");
+  assert.equal(summary.blocking, true);
+});
+
+test("source policy summary blocks allowed flags when allowlist counts are absent", () => {
+  const missingCountDecision = normalizeBridgeAlertDecisionEvent({
+    id: "audit-source-missing-counts",
+    category: "alert_ingestion",
+    action: "bridge_alert_decision",
+    summary: "Chrome bridge alert accepted.",
+    severity: "info",
+    created_at: "2026-06-27T17:00:01.000Z",
+    details: {
+      contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
+      event_id: "chrome-message-1",
+      channel: { id: "chrome-alerts", name: "chrome-alerts" },
+      author: { id: "mike", name: "MikeInvesting" },
+      raw_text: "BTO SPY 500C 6/21 @ 1.25",
+      parser: { confidence: "high" },
+      source: {
+        key: "chrome-alerts",
+        name: "Chrome Alerts",
+        override_matched: true,
+        paper_only: false,
+        require_manual_confirm: false,
+        min_parser_confidence: "medium",
+        observed_parser_confidence: "high",
+        parser_confidence_allowed: true,
+        allowed_channel_url_count: undefined,
+        channel_url_allowed: true,
+        allowed_author_id_count: undefined,
+        author_id_allowed: true,
+        metadata_policy_passed: true,
+      },
+      decision: {
+        status: "accepted",
+        alert_inserted: true,
+        alert_id: "alert-1",
+        trade_requested: false,
+        trade_request_reason: "auto trading disabled",
+        skip_reason: "",
+      },
+    },
+  });
+  const chain = buildAlertEvidenceChains({ signals: [signal], decisions: [missingCountDecision] })[0];
+  const summary = buildSourcePolicySummary(chain);
+
+  assert.equal(summary.statusLabel, "Source policy blocked");
+  assert.equal(summary.gateLabel, "Blocks alert");
   assert.equal(summary.channelLabel, "Channel allowlist proof missing");
   assert.equal(summary.authorLabel, "Author allowlist proof missing");
   assert.equal(summary.blocking, true);
