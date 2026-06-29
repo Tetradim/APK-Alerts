@@ -48,7 +48,7 @@ function normalizeString(value: unknown, defaultValue: string): string {
 }
 
 function normalizeNonNegativeNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
 export function normalizeRemoteHealthPayload(payload: unknown): NormalizedRemoteHealth {

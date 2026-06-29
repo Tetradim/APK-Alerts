@@ -122,7 +122,7 @@ test("remote engine snapshot is healthy only when health, status, and runtime ar
       auto_trading_enabled: true,
       simulation_mode: false,
       shutdown_triggered: false,
-      alerts_processed: 3.8,
+      alerts_processed: 3,
     }),
     checkedAt: "2026-06-27T15:00:00Z",
   });
@@ -132,6 +132,14 @@ test("remote engine snapshot is healthy only when health, status, and runtime ar
   assert.equal(snapshot.alertsProcessed, 3);
   assert.equal(snapshot.discordConnected, true);
   assert.equal(snapshot.brokerConnected, true);
+});
+
+test("remote status rejects fractional alert counts", () => {
+  const status = normalizeRemoteStatusPayload({
+    alerts_processed: 3.8,
+  });
+
+  assert.equal(status.alertsProcessed, 0);
 });
 
 test("remote engine snapshot is not execution-ready while simulation mode is enabled", () => {
