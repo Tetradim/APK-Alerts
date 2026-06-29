@@ -303,6 +303,23 @@ test("peer alert failsafe blocks stale phone alert observation", () => {
   assert.equal(stale.skewMs, 12000);
 });
 
+test("peer alert failsafe ignores fractional max skew settings", () => {
+  const stale = evaluateAlertPeerResponse(
+    challenge,
+    response({
+      phoneObservedAt: "2026-06-27T18:00:12.000Z",
+      phoneReceivedAt: "2026-06-27T18:00:12.250Z",
+      respondedAt: "2026-06-27T18:00:13.000Z",
+    }, { observedAt: "2026-06-27T18:00:13.000Z" }),
+    { maxAlertSkewMs: 15000.5 },
+  );
+
+  assert.equal(stale.status, "stale");
+  assert.equal(stale.blocking, true);
+  assert.deepEqual(stale.blockingCodes, ["alert_timestamp_skew_exceeded"]);
+  assert.equal(stale.skewMs, 12000);
+});
+
 test("peer alert failsafe covers timing blockers", () => {
   const cases: Array<{
     name: string;

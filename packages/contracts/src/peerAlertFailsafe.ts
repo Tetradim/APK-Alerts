@@ -337,7 +337,7 @@ function parseTimestamp(value: string): number | null {
 }
 
 function normalizeMaxSkew(value: number | undefined): number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
     ? value
     : DEFAULT_MAX_ALERT_SKEW_MS;
 }
