@@ -282,7 +282,23 @@ export function buildAlertEvidenceChains(input: BuildAlertEvidenceChainsInput = 
         decision,
       };
     })
-    .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
+    .sort(compareAlertEvidenceChains);
+}
+
+function compareAlertEvidenceChains(a: AlertEvidenceChain, b: AlertEvidenceChain): number {
+  if (a.observedAt && b.observedAt) {
+    const timestampOrder = b.observedAt.localeCompare(a.observedAt);
+    if (timestampOrder !== 0) {
+      return timestampOrder;
+    }
+  }
+  if (a.observedAt && !b.observedAt) {
+    return -1;
+  }
+  if (!a.observedAt && b.observedAt) {
+    return 1;
+  }
+  return a.eventId.localeCompare(b.eventId);
 }
 
 function normalizeIngestionResult(input: unknown, fallbackStatus: BridgeEvidenceStatus = "unknown"): BridgeIngestionResult {
@@ -450,7 +466,7 @@ function finiteNumberOrNull(input: unknown): number | null {
 }
 
 function nonNegativeInteger(input: unknown): number {
-  return typeof input === "number" && Number.isInteger(input) && input > 0 ? input : 0;
+  return typeof input === "number" && Number.isInteger(input) && input >= 0 ? input : 0;
 }
 
 function nonNegativeIntegerOrNull(input: unknown): number | null {

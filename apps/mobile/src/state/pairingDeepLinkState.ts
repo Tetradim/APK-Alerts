@@ -87,7 +87,7 @@ export function installPairingDeepLinkHandler(
         handleUrl(url);
       }
     })
-    .catch(() => undefined);
+    .catch((error) => console.warn("[pairingDeepLink] getInitialURL failed:", error));
 
   const subscription = source.addEventListener("url", (event) => handleUrl(event.url));
   return () => {

@@ -6,7 +6,7 @@ import {
   createSetupAutomationStore,
   getDefaultWindowsSetupEvidence,
 } from "./setupAutomationState.js";
-import { applyPairingDeepLink } from "./pairingDeepLinkState.js";
+import { applyPairingDeepLink, installPairingDeepLinkHandler } from "./pairingDeepLinkState.js";
 
 test("pairing deep link handler imports pair URL and updates remote connection", () => {
   const setupStore = createSetupAutomationStore(() => "2026-06-28T10:02:00Z");
@@ -68,4 +68,41 @@ test("pairing deep link handler reports malformed pairing links without exposing
   assert.match(result.error, /valid pairing payload/);
   assert.doesNotMatch(result.error, /not-json/);
   assert.equal(remoteStore.getState().snapshot.connection.baseApiUrl, "");
+});
+
+test("pairing deep link handler warns when initial URL lookup fails", async () => {
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args);
+  };
+
+  try {
+    const unsubscribe = installPairingDeepLinkHandler(
+      {
+        getInitialURL: () => Promise.reject(new Error("linking unavailable")),
+        addEventListener: () => ({ remove: () => undefined }),
+      },
+      {
+        importPairingPackage: () => ({
+          ok: false,
+          inputFormat: "unknown",
+          connection: null,
+          config: null,
+          evidence: getDefaultWindowsSetupEvidence(),
+          error: "",
+        }),
+        updateConnectionDraft: () => undefined,
+      },
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+    unsubscribe();
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0]?.[0], "[pairingDeepLink] getInitialURL failed:");
+  assert.match(String(warnings[0]?.[1]), /linking unavailable/);
 });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
@@ -7,6 +8,8 @@ import {
   normalizeBridgeHealthPayload,
   normalizeBridgeSignalEvent,
 } from "./bridgeEvidence";
+
+const bridgeEvidenceSource = readFileSync(new URL("./bridgeEvidence.ts", import.meta.url), "utf8");
 
 const signalEvent = {
   version: "bot-event.v1",
@@ -173,6 +176,13 @@ test("skipped low-confidence audit preserves source policy proof", () => {
   assert.equal(lowConfidenceDecision.decision.skipReason, "parser confidence low below required medium");
 });
 
+test("bridge source policy count normalizer accepts explicit zero counts", () => {
+  assert.match(
+    bridgeEvidenceSource,
+    /function nonNegativeInteger\(input: unknown\): number \{\s+return typeof input === "number" && Number\.isInteger\(input\) && input >= 0 \? input : 0;\s+\}/,
+  );
+});
+
 test("malformed bridge evidence normalizes to empty fail-closed values", () => {
   const signal = normalizeBridgeSignalEvent(null);
   const decision = normalizeBridgeAlertDecisionEvent({ details: "bad" });
@@ -185,6 +195,45 @@ test("malformed bridge evidence normalizes to empty fail-closed values", () => {
   assert.equal(decision.status, "unknown");
   assert.equal(decision.source.overrideMatched, false);
   assert.equal(decision.source.metadataPolicyPassed, false);
+});
+
+test("alert evidence chains sort timestamped evidence first and timestamp-less ties deterministically", () => {
+  const datedDecision = normalizeBridgeAlertDecisionEvent({
+    ...auditEvent,
+    id: "audit-dated",
+    created_at: "2026-06-27T17:00:03.000Z",
+    details: {
+      ...auditEvent.details,
+      event_id: "dated-alert",
+    },
+  });
+  const zNoTimestampDecision = normalizeBridgeAlertDecisionEvent({
+    ...auditEvent,
+    id: "audit-z-no-time",
+    created_at: "",
+    details: {
+      ...auditEvent.details,
+      event_id: "z-no-time-alert",
+    },
+  });
+  const aNoTimestampDecision = normalizeBridgeAlertDecisionEvent({
+    ...auditEvent,
+    id: "audit-a-no-time",
+    created_at: "",
+    details: {
+      ...auditEvent.details,
+      event_id: "a-no-time-alert",
+    },
+  });
+
+  const chains = buildAlertEvidenceChains({
+    decisions: [zNoTimestampDecision, datedDecision, aNoTimestampDecision],
+  });
+
+  assert.deepEqual(
+    chains.map((chain) => chain.eventId),
+    ["dated-alert", "a-no-time-alert", "z-no-time-alert"],
+  );
 });
 
 test("bridge health normalizes disabled stale heartbeat as unhealthy", () => {
