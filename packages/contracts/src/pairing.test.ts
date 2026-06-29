@@ -59,6 +59,25 @@ test("remote pairing config normalization keeps the explicit import key", () => 
   assert.equal(config.transportHint, "tailscale");
 });
 
+test("remote pairing normalization rejects fractional numeric fields", () => {
+  const status = normalizeRemotePairingStatusPayload({
+    version: 1.5,
+    remote_bind: {
+      host: "0.0.0.0",
+      port: 8003.9,
+      remote_accessible: true,
+    },
+  });
+  const config = normalizeRemotePairingConfigPayload({
+    version: 2.25,
+    remote_api_url: "http://100.90.10.11:8003/api",
+  });
+
+  assert.equal(status.version, 0);
+  assert.equal(status.remoteBind.port, 0);
+  assert.equal(config.version, 0);
+});
+
 test("remote pairing package input parses JSON and apkalerts deep links", () => {
   const config = {
     version: 1,
