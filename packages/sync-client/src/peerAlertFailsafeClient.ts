@@ -107,7 +107,7 @@ function isPeerAlertResponseEvent(input: unknown): input is AlertPeerResponseEve
     !isNonEmptyString(input.sourceEngineId) ||
     !isNonEmptyString(input.observedAt) ||
     typeof input.sequence !== "number" ||
-    !Number.isFinite(input.sequence)
+    !Number.isInteger(input.sequence)
   ) {
     return false;
   }

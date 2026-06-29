@@ -207,6 +207,25 @@ test("peer alert challenge endpoint rejects route method and invalid challenge w
   assert.equal(recorded.length, 0);
 });
 
+test("peer alert challenge endpoint rejects fractional challenge sequence", async () => {
+  const recorded: PeerAlertChallengeEndpointOutcome[] = [];
+  const result = await handlePeerAlertChallengeRequest(
+    endpointConfig({ recordOutcome: (outcome) => recorded.push(outcome) }),
+    {
+      method: "POST",
+      path: PEER_ALERT_CHALLENGE_PATH,
+      body: {
+        ...challenge,
+        sequence: 100.5,
+      },
+    },
+  );
+
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, "Peer alert challenge payload invalid.");
+  assert.equal(recorded.length, 0);
+});
+
 test("peer alert challenge endpoint responds fail-closed when phone has no alert copy", async () => {
   const result = await handlePeerAlertChallengeRequest(
     endpointConfig({ getLastAlert: () => null }),

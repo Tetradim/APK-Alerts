@@ -211,7 +211,7 @@ function isAlertPeerChallengeEvent(input: unknown): input is AlertPeerChallengeE
     !isNonEmptyString(input.sourceEngineId) ||
     !isNonEmptyString(input.observedAt) ||
     typeof input.sequence !== "number" ||
-    !Number.isFinite(input.sequence)
+    !Number.isInteger(input.sequence)
   ) {
     return false;
   }

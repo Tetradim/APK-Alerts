@@ -141,6 +141,23 @@ test("remote peer alert client returns evaluated mismatch for valid blocked phon
   assert.equal(result.evaluation.blockingCodes.includes("source_key_mismatch"), true);
 });
 
+test("remote peer alert client rejects fractional response sequence", async () => {
+  const fractionalSequenceResponse = {
+    ...phoneResponse,
+    sequence: 101.5,
+  };
+  const result = await requestPhoneAlertPeerResponse({
+    baseApiUrl: "http://127.0.0.1:8001/api",
+    fetchImpl: async () => jsonResponse({ response: fractionalSequenceResponse }),
+    now: () => "2026-06-27T18:00:04.000Z",
+  }, challenge);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "Peer alert response payload invalid.");
+  assert.equal(result.response, null);
+  assert.equal(result.evaluation.status, "missing_response");
+});
+
 test("remote peer alert client fails closed for HTTP network and invalid response payloads", async () => {
   const httpResult = await requestPhoneAlertPeerResponse({
     baseApiUrl: "http://127.0.0.1:8001/api",
