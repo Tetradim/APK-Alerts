@@ -1,4 +1,4 @@
-import type { DiscordIngestionRoute, EnginePriority, TransportPreference } from "@apk-alerts/contracts";
+import type { DiscordIngestionRoute, EnginePriority, TransportPreference } from "@sentinel-nexus/contracts";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { ScreenFrame } from "@/components/ScreenFrame";
 import { SegmentedChoice } from "@/components/SegmentedChoice";
@@ -64,7 +64,7 @@ export function SettingsScreen() {
   );
 
   return (
-    <ScreenFrame title="Settings" eyebrow="APK-Alerts">
+    <ScreenFrame title="Settings" eyebrow="Sentinel Nexus">
       <View style={styles.summaryPanel}>
         <Text style={styles.summaryLabel}>Current failover policy</Text>
         <Text style={styles.summaryValue}>{summary.engineLabel}</Text>
@@ -92,7 +92,7 @@ export function SettingsScreen() {
         />
         <SettingRow
           label="Remote Engine"
-          description="Allow the Windows Consolidation engine to take over when the phone engine is not healthy."
+          description="Allow the Windows Sentinel Echo engine to take over when the phone engine is not healthy."
           value={failoverSettings.remoteEngineEnabled}
           onValueChange={(remoteEngineEnabled) => updateFailoverSettings({ remoteEngineEnabled })}
         />
@@ -158,7 +158,7 @@ export function SettingsScreen() {
         />
         <SettingRow
           label="Foreground Keepalive"
-          description="Keep Mobile Consolidation active with an Android foreground notification."
+          description="Keep Sentinel Nexus active with an Android foreground notification."
           value={discordIngestionSettings.foregroundServiceEnabled}
           onValueChange={(foregroundServiceEnabled) =>
             updateDiscordIngestionSettings({ foregroundServiceEnabled })

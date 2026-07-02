@@ -13,7 +13,7 @@ import {
   type EngineId,
   type LeaseEvent,
   type LeaseEvidenceSnapshot,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildRemoteEndpointClient,
   fetchRemoteJson,

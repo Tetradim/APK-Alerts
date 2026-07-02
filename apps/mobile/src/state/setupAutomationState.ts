@@ -2,7 +2,7 @@ import {
   parseRemotePairingPackageInput,
   type RemotePairingConfig,
   type RemotePairingPackageInputFormat,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 import {
@@ -30,7 +30,7 @@ import type { RemoteConnectionDraft, RemoteEngineSnapshot } from "./remoteEngine
 
 export interface WindowsSetupEvidence {
   installerRanAt: string;
-  consolidationRepoReady: boolean;
+  sentinelEchoRepoReady: boolean;
   tailscaleInstalled: boolean;
   tailscaleLoggedIn: boolean;
   tailscaleIp: string;
@@ -156,7 +156,7 @@ export function getDefaultSetupAutomationSnapshot(): SetupAutomationSnapshot {
 export function getDefaultWindowsSetupEvidence(): WindowsSetupEvidence {
   return {
     installerRanAt: "",
-    consolidationRepoReady: false,
+    sentinelEchoRepoReady: false,
     tailscaleInstalled: false,
     tailscaleLoggedIn: false,
     tailscaleIp: "",
@@ -260,10 +260,10 @@ export function importMobilePairingPackage(
   const remoteApiUrl = config.remoteApiUrl.trim();
   const apiKey = config.apiKey.trim();
 
-  if (config.version <= 0 || config.app !== "mobile-consolidation") {
+  if (config.version <= 0 || config.app !== "sentinel-nexus") {
     return failPairingImport(
       currentEvidence,
-      "Pairing package is not for Mobile Consolidation.",
+      "Pairing package is not for Sentinel Nexus.",
       parsed.format,
     );
   }
@@ -316,7 +316,7 @@ export function buildWindowsApiPreflightSummary(
       statusLabel: "Not checked",
       checkedAtLabel: "Not checked",
       detailLabel: "Run the Windows installer preflight for firewall and API diagnostics.",
-      repairLabel: "Run tools/windows/install-mobile-consolidation.ps1 on the remote Windows computer.",
+      repairLabel: "Run tools/windows/install-sentinel-nexus.ps1 on the remote Windows computer.",
       blocking: true,
     };
   }
@@ -366,11 +366,11 @@ export function buildSetupAutomationSummary(
     createItem({
       key: "windows_installer",
       label: "Windows installer",
-      ready: Boolean(input.windows.installerRanAt) && input.windows.consolidationRepoReady,
+      ready: Boolean(input.windows.installerRanAt) && input.windows.sentinelEchoRepoReady,
       readyStatus: "Installed",
       blockedStatus: "Not run",
       readyDetail: `Installer completed ${input.windows.installerRanAt}`,
-      blockedDetail: "Run the Windows bootstrapper on the remote Consolidation computer.",
+      blockedDetail: "Run the Windows bootstrapper on the remote Sentinel Echo computer.",
       actionLabel: "Run Windows installer",
     }),
     createItem({
@@ -402,7 +402,7 @@ export function buildSetupAutomationSummary(
       readyStatus: "Bound",
       blockedStatus: "Not bound",
       readyDetail: input.remote.connection.baseApiUrl,
-      blockedDetail: "Start Consolidation with a remote API URL that the phone can reach.",
+      blockedDetail: "Start Sentinel Echo with a remote API URL that the phone can reach.",
       actionLabel: "Start remote API",
     }),
     createItem({
@@ -524,7 +524,7 @@ export function buildSetupSmokeTestSummary(input: SetupSmokeTestInput): SetupSmo
       readyStatus: "Healthy",
       blockedStatus: "Unproven",
       readyDetail: `Remote checked ${input.remote.remote.checkedAt}`,
-      blockedDetail: "Check the remote Consolidation API after pairing.",
+      blockedDetail: "Check the remote Sentinel Echo API after pairing.",
       actionLabel: "Check remote health",
     }),
     createItem({

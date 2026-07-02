@@ -1,7 +1,7 @@
 import {
   normalizeDiscordIngestionSettings,
   type DiscordIngestionSettingsInput,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 

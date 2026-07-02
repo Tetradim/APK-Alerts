@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "APK Alerts",
-    "slug": "apk-alerts",
+    "name": "Sentinel Nexus",
+    "slug": "sentinel-nexus",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "apkalerts",
+    "scheme": "sentinelnexus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "android": {
-      "package": "com.tetradim.apkalerts",
+      "package": "com.tetradim.sentinelnexus",
       "versionCode": 1,
       "permissions": [
         "android.permission.INTERNET",

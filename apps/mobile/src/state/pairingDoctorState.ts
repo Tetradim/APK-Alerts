@@ -1,10 +1,10 @@
-import type { RemotePairingStatus } from "@apk-alerts/contracts";
+import type { RemotePairingStatus } from "@sentinel-nexus/contracts";
 import {
   runRemotePairingDoctor,
   type RemotePairingClientConfig,
   type RemotePairingDoctorResult,
   type RemotePairingEndpointProbeResult,
-} from "@apk-alerts/sync-client";
+} from "@sentinel-nexus/sync-client";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 

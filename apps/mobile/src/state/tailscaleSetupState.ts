@@ -67,7 +67,7 @@ export function buildMobileTailscaleSetupAction(
       key: "import_pairing",
       statusLabel: "Import pairing",
       actionLabel: "Import Pairing Link",
-      detailLabel: "Open the apkalerts://pair link or paste the JSON from the Windows installer.",
+      detailLabel: "Open the sentinelnexus://pair link or paste the JSON from the Windows installer.",
       primaryUrl: "",
       fallbackUrl: "",
       blocking: true,

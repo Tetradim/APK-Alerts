@@ -7,7 +7,7 @@ import {
   normalizeLiveReadinessPayload,
   normalizeRemoteHealthPayload,
   normalizeRemoteStatusPayload,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   getDefaultAlertEvidenceSnapshot,
   type AlertEvidenceSnapshot,

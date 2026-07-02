@@ -3,17 +3,17 @@ import {
   normalizeFailoverSettings,
   type DiscordIngestionSettings,
   type FailoverSettings,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import type { RemoteConnectionDraft } from "./remoteEngineState";
 import {
   getDefaultWindowsSetupEvidence,
   type WindowsSetupEvidence,
 } from "./setupAutomationState";
 
-export const REMOTE_CONNECTION_STORAGE_KEY = "apk-alerts.remote-connection.v1";
-export const FAILOVER_SETTINGS_STORAGE_KEY = "apk-alerts.failover-settings.v1";
-export const DISCORD_INGESTION_SETTINGS_STORAGE_KEY = "apk-alerts.discord-ingestion-settings.v1";
-export const SETUP_AUTOMATION_STORAGE_KEY = "apk-alerts.setup-automation.v1";
+export const REMOTE_CONNECTION_STORAGE_KEY = "sentinel-nexus.remote-connection.v1";
+export const FAILOVER_SETTINGS_STORAGE_KEY = "sentinel-nexus.failover-settings.v1";
+export const DISCORD_INGESTION_SETTINGS_STORAGE_KEY = "sentinel-nexus.discord-ingestion-settings.v1";
+export const SETUP_AUTOMATION_STORAGE_KEY = "sentinel-nexus.setup-automation.v1";
 
 export interface SecureSettingsStorage {
   getItemAsync: (key: string) => Promise<string | null>;
@@ -96,7 +96,7 @@ function normalizeSetupEvidence(payload: Record<string, unknown> | WindowsSetupE
   const defaults = getDefaultWindowsSetupEvidence();
   return {
     installerRanAt: cleanString(payload.installerRanAt) || defaults.installerRanAt,
-    consolidationRepoReady: payload.consolidationRepoReady === true,
+    sentinelEchoRepoReady: payload.sentinelEchoRepoReady === true,
     tailscaleInstalled: payload.tailscaleInstalled === true,
     tailscaleLoggedIn: payload.tailscaleLoggedIn === true,
     tailscaleIp: cleanString(payload.tailscaleIp) || defaults.tailscaleIp,

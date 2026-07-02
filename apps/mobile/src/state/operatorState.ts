@@ -4,7 +4,7 @@ import {
   buildTransportLabel,
   type FailoverSettingsInput,
   normalizeFailoverSettings,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 
 export type ActiveEngine = "phone" | "remote" | "none";
 export type EngineHealth = "healthy" | "degraded" | "offline" | "unknown";

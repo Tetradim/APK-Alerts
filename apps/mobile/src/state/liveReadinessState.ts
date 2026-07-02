@@ -1,10 +1,10 @@
-import { normalizeLiveReadinessPayload } from "@apk-alerts/contracts";
+import { normalizeLiveReadinessPayload } from "@sentinel-nexus/contracts";
 import {
   fetchRemoteLiveReadiness,
   type RemoteLiveReadinessClientConfig,
   type RemoteLiveReadinessResult,
   type RemoteLiveReadinessSnapshot,
-} from "@apk-alerts/sync-client";
+} from "@sentinel-nexus/sync-client";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 import { classifyRemoteTransport, type RemoteTransport } from "./remoteEngineState";

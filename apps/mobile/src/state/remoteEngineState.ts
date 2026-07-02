@@ -4,12 +4,12 @@ import {
   normalizeRemoteStatusPayload,
   type RemoteEngineHealth,
   type RemoteEngineHealthSnapshot,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   checkRemoteEngineHealth,
   type RemoteEngineCheckResult,
   type RemoteEngineClientConfig,
-} from "@apk-alerts/sync-client";
+} from "@sentinel-nexus/sync-client";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 import {

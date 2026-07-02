@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildIdempotencyKey, createEvent } from "@apk-alerts/contracts";
+import { buildIdempotencyKey, createEvent } from "@sentinel-nexus/contracts";
 import { DuplicateEventError, InMemoryEventLog, UnknownCursorError } from "./eventLog";
 
 test("event log appends events and reads them after a cursor", () => {

@@ -1,4 +1,4 @@
-import type { EngineHealthStatus } from "@apk-alerts/contracts";
+import type { EngineHealthStatus } from "@sentinel-nexus/contracts";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 

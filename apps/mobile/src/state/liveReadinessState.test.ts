@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeLiveReadinessPayload } from "@apk-alerts/contracts";
+import { normalizeLiveReadinessPayload } from "@sentinel-nexus/contracts";
 import {
   buildExitProtectionAuditDigest,
   buildExitProtectionEvidenceSummary,

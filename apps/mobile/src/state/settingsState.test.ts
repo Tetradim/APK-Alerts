@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   DEFAULT_DISCORD_INGESTION_SETTINGS,
   DEFAULT_FAILOVER_SETTINGS,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   DISCORD_INGESTION_SETTINGS_STORAGE_KEY,
   FAILOVER_SETTINGS_STORAGE_KEY,

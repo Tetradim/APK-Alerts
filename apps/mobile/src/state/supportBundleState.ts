@@ -2,7 +2,7 @@ import {
   DEFAULT_DISCORD_INGESTION_SETTINGS,
   type DiscordIngestionAuditDigest,
   type DiscordIngestionSettings,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildAlertAuditDigest,
   buildAlertTestEvidenceSummary,
@@ -72,7 +72,7 @@ export interface SetupHealthReportSummary {
 
 export interface MobileSupportBundle {
   createdAt: string;
-  app: "mobile-consolidation";
+  app: "sentinel-nexus";
   remoteConnection: {
     baseApiUrl: string;
     transport: string;
@@ -261,7 +261,7 @@ export function buildMobileSupportBundle(input: MobileSupportBundleInput): Mobil
   });
   return {
     createdAt: input.createdAt,
-    app: "mobile-consolidation",
+    app: "sentinel-nexus",
     remoteConnection: {
       baseApiUrl: input.remote.connection.baseApiUrl,
       transport: input.remote.connection.transport,

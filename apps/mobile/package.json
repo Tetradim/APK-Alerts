@@ -1,5 +1,5 @@
 {
-  "name": "@apk-alerts/mobile",
+  "name": "@sentinel-nexus/mobile",
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
@@ -11,9 +11,9 @@
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
-    "@apk-alerts/contracts": "0.1.0",
-    "@apk-alerts/peer-alert-server": "0.1.0",
-    "@apk-alerts/sync-client": "0.1.0",
+    "@sentinel-nexus/contracts": "0.1.0",
+    "@sentinel-nexus/peer-alert-server": "0.1.0",
+    "@sentinel-nexus/sync-client": "0.1.0",
     "@babel/runtime": "^7.20.6",
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/bottom-tabs": "^7.3.10",

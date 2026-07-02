@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_FAILOVER_SETTINGS } from "@apk-alerts/contracts";
+import { DEFAULT_FAILOVER_SETTINGS } from "@sentinel-nexus/contracts";
 import {
   buildEngineCommunicationProofSummary,
   buildCockpitSummary,

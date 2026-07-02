@@ -18,7 +18,7 @@ function setupSummary(
         key: "windows_installer",
         label: "Windows installer",
         statusLabel: "Not run",
-        detailLabel: "Run the Windows bootstrapper on the remote Consolidation computer.",
+        detailLabel: "Run the Windows bootstrapper on the remote Sentinel Echo computer.",
         actionLabel: "Run Windows installer",
         blocking: true,
       },

@@ -4,7 +4,7 @@ import {
   type AlertPeerFailsafeEvaluation,
   type AlertPeerFailsafeOptions,
   type AlertPeerResponseEvent,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildRemoteEndpointClient,
   fetchRemoteJson,

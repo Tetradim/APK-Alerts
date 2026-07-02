@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-APK-Alerts must not claim live-money readiness unless the live-readiness endpoint passes all required broker, source, credential, reconciliation, OCO exit, runtime, and arming checks.
+Sentinel Nexus must not claim live-money readiness unless the live-readiness endpoint passes all required broker, source, credential, reconciliation, OCO exit, runtime, and arming checks.
 
 ## Context
 

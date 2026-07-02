@@ -118,7 +118,7 @@ export function MoreScreen() {
   const readiness = snapshot.remote.readiness;
 
   return (
-    <ScreenFrame title="More" eyebrow="APK-Alerts">
+    <ScreenFrame title="More" eyebrow="Sentinel Nexus">
       <View style={styles.headerRow}>
         <View style={styles.headerCopy}>
           <Text style={styles.label}>Live readiness</Text>

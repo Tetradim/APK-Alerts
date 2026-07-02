@@ -1,10 +1,10 @@
-import { summarizeReconciliationRows, type ReconciliationRow } from "@apk-alerts/contracts";
+import { summarizeReconciliationRows, type ReconciliationRow } from "@sentinel-nexus/contracts";
 import {
   fetchRemoteReconciliation,
   type RemoteReconciliationClientConfig,
   type RemoteReconciliationResult,
   type RemoteReconciliationSnapshot,
-} from "@apk-alerts/sync-client";
+} from "@sentinel-nexus/sync-client";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 import { classifyRemoteTransport, type RemoteTransport } from "./remoteEngineState";

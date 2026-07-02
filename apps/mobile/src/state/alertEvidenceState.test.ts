@@ -8,7 +8,7 @@ import {
   normalizeBridgeHealthPayload,
   normalizeBridgeSignalEvent,
   normalizeLeaseEvidenceSnapshot,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildAlertReconciliationTraceSummary,
   buildAlertEvidenceTimeline,
@@ -367,7 +367,7 @@ test("bridge supervisor summary surfaces restart backoff and failures", () => {
           channel_id: "chrome-extension-service-worker",
           details: {
             source: "service_worker",
-            reason: "consolidation-bridge-supervisor",
+            reason: "sentinel-echo-bridge-supervisor",
             failures: ["content script did not respond after restart"],
             restart_attempt: 2,
             next_restart_at: "2026-06-27T17:05:00.000Z",

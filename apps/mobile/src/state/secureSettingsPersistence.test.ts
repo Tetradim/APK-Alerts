@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   DEFAULT_DISCORD_INGESTION_SETTINGS,
   DEFAULT_FAILOVER_SETTINGS,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   DISCORD_INGESTION_SETTINGS_STORAGE_KEY,
   FAILOVER_SETTINGS_STORAGE_KEY,
@@ -105,7 +105,7 @@ test("secure persistence saves setup evidence without pairing package secrets", 
       checkedAt: "2026-06-28T10:01:30Z",
       remoteApiUrl: "http://100.90.10.11:8003/api",
       apiPort: 8003,
-      firewallRuleName: "Mobile Consolidation API 8003",
+      firewallRuleName: "Sentinel Nexus API 8003",
       firewallRulePresent: true,
       localHealthOk: true,
       phoneReachabilityOk: false,

@@ -16,7 +16,7 @@ const signalEvent = {
   created_at: "2026-06-27T17:00:00.000Z",
   correlation_id: "chrome-message-1",
   dedupe_key: "chrome-discord:chrome-message-1",
-  target_bots: ["consolidation", "sentinel-edge", "simulation-engine"],
+  target_bots: ["sentinel-echo", "sentinel-edge", "sentinel-archive"],
   payload: {
     contract_version: CHROME_DISCORD_MESSAGE_CONTRACT_VERSION,
     event_id: "chrome-message-1",
@@ -26,8 +26,8 @@ const signalEvent = {
     channel_url: "https://discord.com/channels/1/approved",
     url: "https://discord.com/channels/1/approved/999",
     observed_at: "2026-06-27T17:00:00.000Z",
-    bridge_target_id: "consolidation",
-    bridge_target_name: "Consolidation",
+    bridge_target_id: "sentinel-echo",
+    bridge_target_name: "Sentinel Echo",
     author_id: "mike",
     author_name: "MikeInvesting",
     raw_text: "BTO SPY 500C 6/21 @ 1.25",
@@ -76,8 +76,8 @@ const auditEvent = {
       name: "MikeInvesting",
     },
     bridge_target: {
-      id: "consolidation",
-      name: "Consolidation",
+      id: "sentinel-echo",
+      name: "Sentinel Echo",
     },
     raw_text: "BTO SPY 500C 6/21 @ 1.25",
     capture_path: "C:/captures/chrome-message-1.json",
@@ -296,7 +296,7 @@ test("bridge health normalizes service worker supervisor backoff evidence", () =
       observed_at: "2026-06-27T17:04:00.000Z",
       details: {
         source: "service_worker",
-        reason: "consolidation-bridge-supervisor",
+        reason: "sentinel-echo-bridge-supervisor",
         failures: ["content script did not respond after restart"],
         discord_tabs: 2,
         configured_targets: 1,
@@ -308,7 +308,7 @@ test("bridge health normalizes service worker supervisor backoff evidence", () =
 
   assert.equal(health.supervisor.state, "backoff");
   assert.equal(health.supervisor.source, "service_worker");
-  assert.equal(health.supervisor.reason, "consolidation-bridge-supervisor");
+  assert.equal(health.supervisor.reason, "sentinel-echo-bridge-supervisor");
   assert.deepEqual(health.supervisor.failures, ["content script did not respond after restart"]);
   assert.equal(health.supervisor.discordTabs, 2);
   assert.equal(health.supervisor.configuredTargets, 1);

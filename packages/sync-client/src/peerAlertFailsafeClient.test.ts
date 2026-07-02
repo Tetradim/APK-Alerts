@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPhoneAlertPeerResponseEvent, createEvent } from "@apk-alerts/contracts";
+import { buildPhoneAlertPeerResponseEvent, createEvent } from "@sentinel-nexus/contracts";
 import {
   normalizePeerAlertFailsafeBaseUrl,
   requestPhoneAlertPeerResponse,

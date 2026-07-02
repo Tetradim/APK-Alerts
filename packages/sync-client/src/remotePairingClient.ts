@@ -2,7 +2,7 @@ import {
   normalizeRemotePairingStatusPayload,
   type RemotePairingEndpoint,
   type RemotePairingStatus,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildRemoteEndpointClient,
   fetchRemoteJson,

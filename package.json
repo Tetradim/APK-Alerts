@@ -1,5 +1,5 @@
 {
-  "name": "apk-alerts",
+  "name": "sentinel-nexus",
   "version": "0.1.0",
   "private": true,
   "packageManager": "npm@11.14.1",
@@ -11,9 +11,9 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "mobile:dev": "npm --workspace @apk-alerts/mobile run dev --",
-    "mobile:android": "npm --workspace @apk-alerts/mobile run android --",
-    "mobile:web": "npm --workspace @apk-alerts/mobile run web --"
+    "mobile:dev": "npm --workspace @sentinel-nexus/mobile run dev --",
+    "mobile:android": "npm --workspace @sentinel-nexus/mobile run android --",
+    "mobile:web": "npm --workspace @sentinel-nexus/mobile run web --"
   },
   "overrides": {
     "xcode@3.0.1": {

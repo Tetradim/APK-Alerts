@@ -49,7 +49,7 @@ export interface RemotePairingPackageInputResult {
   error: string;
 }
 
-const PAIRING_DEEP_LINK_SCHEME = "apkalerts:";
+const PAIRING_DEEP_LINK_SCHEME = "sentinelnexus:";
 const PAIRING_DEEP_LINK_HOST = "pair";
 const BASE64_URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -183,7 +183,7 @@ export function buildRemotePairingDeepLink(config: RemotePairingConfig): string 
     transportHint: config.transportHint,
     requiredEndpoints: config.requiredEndpoints,
   };
-  return `apkalerts://pair?payload=${encodeBase64Url(JSON.stringify(payload))}`;
+  return `sentinelnexus://pair?payload=${encodeBase64Url(JSON.stringify(payload))}`;
 }
 
 export function parseRemotePairingPackageInput(rawInput: string): RemotePairingPackageInputResult {
@@ -203,7 +203,7 @@ export function parseRemotePairingPackageInput(rawInput: string): RemotePairingP
 
   return failedPairingPackageInput(
     "unknown",
-    "Pairing package must be valid JSON or an apkalerts://pair deep link.",
+    "Pairing package must be valid JSON or an sentinelnexus://pair deep link.",
   );
 }
 

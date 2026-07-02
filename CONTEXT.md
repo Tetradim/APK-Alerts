@@ -1,11 +1,11 @@
-# APK-Alerts / Mobile Consolidation Context
+# Sentinel Nexus / Sentinel Echo Context
 
-APK-Alerts is the Android operator app for Mobile Consolidation. The target behavior is deterministic, auditable trading automation where every alert can be traced through see, parse, decide, place or queue, and reconcile evidence before any live-money claim.
+Sentinel Nexus is the Android operator app for Sentinel Echo. The target behavior is deterministic, auditable trading automation where every alert can be traced through see, parse, decide, place or queue, and reconcile evidence before any live-money claim.
 
 ## Domain Terms
 
 - Phone Engine: Native Android foreground service plus embedded Discord and broker runtime. It can only execute when runtime health, broker readiness, ingestion evidence, and lease evidence are all clear.
-- Remote Engine: Windows Consolidation process exposed through a private Tailscale/local/cloud API. It remains reachable while dormant and resumes when the phone no longer owns a valid lease.
+- Remote Engine: Windows Sentinel Echo process exposed through a private Tailscale/local/cloud API. It remains reachable while dormant and resumes when the phone no longer owns a valid lease.
 - Lease: The execution authority record. A healthy engine is only eligible; an audited active lease is what permits active ownership.
 - Lease Evidence: Normalized proof of holder, lease id, holder engine id, expiry, observation time, source, stale state, and conflict state.
 - Peer Alert Challenge: Remote asks the phone for its latest alert fingerprint to verify whether both engines saw the same source alert.

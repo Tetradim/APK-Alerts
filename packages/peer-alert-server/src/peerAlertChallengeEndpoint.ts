@@ -6,7 +6,7 @@ import {
   type AlertPeerResponseEvent,
   type EngineId,
   type PeerAlertFingerprint,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 
 export const PEER_ALERT_CHALLENGE_PATH = "/api/peer-alert/challenges";
 

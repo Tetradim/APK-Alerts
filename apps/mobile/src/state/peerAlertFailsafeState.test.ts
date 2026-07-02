@@ -4,7 +4,7 @@ import {
   buildPhoneAlertPeerResponseEvent,
   createEvent,
   evaluateAlertPeerResponse,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildPeerAlertOutcomeSummary,
   createPeerAlertFailsafeStore,

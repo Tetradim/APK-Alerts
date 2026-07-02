@@ -2,7 +2,7 @@ import {
   canClaimLiveReady,
   normalizeLiveReadinessPayload,
   type LiveReadiness,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildRemoteEndpointClient,
   fetchRemoteJson,

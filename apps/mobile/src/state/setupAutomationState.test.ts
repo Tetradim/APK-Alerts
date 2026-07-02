@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildRemotePairingDeepLink } from "@apk-alerts/contracts";
+import { buildRemotePairingDeepLink } from "@sentinel-nexus/contracts";
 import { getDefaultDiscordWebViewHealthSnapshot } from "./discordWebViewState.js";
 import { getDefaultLiveReadinessSnapshot } from "./liveReadinessState.js";
 import { getDefaultPairingDoctorSnapshot } from "./pairingDoctorState.js";
@@ -43,7 +43,7 @@ test("setup automation fails closed before installer tailscale pairing and smoke
 test("setup automation keeps tailscale blockers explicit after installer starts", () => {
   const input = buildDefaultInput();
   input.windows.installerRanAt = "2026-06-28T10:00:00Z";
-  input.windows.consolidationRepoReady = true;
+  input.windows.sentinelEchoRepoReady = true;
 
   const summary = buildSetupAutomationSummary(input);
 
@@ -59,14 +59,14 @@ test("windows api preflight surfaces concrete repair instructions", () => {
     checkedAt: "2026-06-28T10:01:30Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiPort: 8003,
-    firewallRuleName: "Mobile Consolidation API 8003",
+    firewallRuleName: "Sentinel Nexus API 8003",
     firewallRulePresent: false,
     localHealthOk: false,
     phoneReachabilityOk: false,
     httpStatus: 0,
     failureStage: "firewall_rule",
     repairHint: "Open inbound TCP 8003 on the Private profile, then rerun Pairing Doctor.",
-    repairCommand: "New-NetFirewallRule -DisplayName 'Mobile Consolidation API 8003' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8003 -Profile Private",
+    repairCommand: "New-NetFirewallRule -DisplayName 'Sentinel Nexus API 8003' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8003 -Profile Private",
   };
 
   const summary = buildWindowsApiPreflightSummary(evidence);
@@ -85,26 +85,26 @@ test("windows api preflight prioritizes API health repair hints after firewall p
     checkedAt: "2026-06-28T10:01:30Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiPort: 8003,
-    firewallRuleName: "Mobile Consolidation API 8003",
+    firewallRuleName: "Sentinel Nexus API 8003",
     firewallRulePresent: true,
     localHealthOk: false,
     phoneReachabilityOk: false,
     httpStatus: 0,
     failureStage: "local_health",
-    repairHint: "Start the Consolidation remote API on 0.0.0.0:8003, then rerun Pairing Doctor from the phone.",
-    repairCommand: "New-NetFirewallRule -DisplayName 'Mobile Consolidation API 8003' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8003 -Profile Private",
+    repairHint: "Start the Sentinel Echo remote API on 0.0.0.0:8003, then rerun Pairing Doctor from the phone.",
+    repairCommand: "New-NetFirewallRule -DisplayName 'Sentinel Nexus API 8003' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8003 -Profile Private",
   };
 
   const summary = buildWindowsApiPreflightSummary(evidence);
 
-  assert.match(summary.repairLabel, /Start the Consolidation remote API/);
+  assert.match(summary.repairLabel, /Start the Sentinel Echo remote API/);
   assert.doesNotMatch(summary.repairLabel, /New-NetFirewallRule/);
 });
 
 test("setup automation accepts passing Pairing Doctor as phone reachability proof", () => {
   const input = buildDefaultInput();
   input.windows.installerRanAt = "2026-06-28T10:00:00Z";
-  input.windows.consolidationRepoReady = true;
+  input.windows.sentinelEchoRepoReady = true;
   input.windows.tailscaleInstalled = true;
   input.windows.tailscaleLoggedIn = true;
   input.windows.tailscaleIp = "100.90.10.11";
@@ -115,7 +115,7 @@ test("setup automation accepts passing Pairing Doctor as phone reachability proo
     checkedAt: "2026-06-28T10:01:30Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiPort: 8003,
-    firewallRuleName: "Mobile Consolidation API 8003",
+    firewallRuleName: "Sentinel Nexus API 8003",
     firewallRulePresent: true,
     localHealthOk: true,
     phoneReachabilityOk: false,
@@ -155,7 +155,7 @@ test("setup automation clears only with remote phone pairing health and smoke ev
   input.windows = {
     ...getDefaultWindowsSetupEvidence(),
     installerRanAt: "2026-06-28T10:00:00Z",
-    consolidationRepoReady: true,
+    sentinelEchoRepoReady: true,
     tailscaleInstalled: true,
     tailscaleLoggedIn: true,
     tailscaleIp: "100.90.10.11",
@@ -207,7 +207,7 @@ test("pairing package import extracts remote credentials and records mobile impo
   const result = importMobilePairingPackage(
     JSON.stringify({
       version: 1,
-      app: "mobile-consolidation",
+      app: "sentinel-nexus",
       createdAt: "2026-06-28T10:01:00Z",
       remoteApiUrl: " http://100.90.10.11:8003/api ",
       apiKey: " mobile-secret ",
@@ -228,10 +228,10 @@ test("pairing package import extracts remote credentials and records mobile impo
   assert.equal(result.evidence.remoteApiBound, false);
 });
 
-test("pairing package import accepts apkalerts deep links generated by the remote", () => {
+test("pairing package import accepts sentinelnexus deep links generated by the remote", () => {
   const deepLink = buildRemotePairingDeepLink({
     version: 1,
-    app: "mobile-consolidation",
+    app: "sentinel-nexus",
     createdAt: "2026-06-28T10:01:00Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiKey: "mobile-secret",
@@ -262,7 +262,7 @@ test("pairing package import fails closed for malformed or incomplete package pa
   const result = importMobilePairingPackage(
     JSON.stringify({
       version: 1,
-      app: "mobile-consolidation",
+      app: "sentinel-nexus",
       remoteApiUrl: "http://100.90.10.11:8003/api",
       apiKey: "",
     }),
@@ -280,7 +280,7 @@ test("setup automation store records valid pairing imports and preserves evidenc
   const store = createSetupAutomationStore(() => "2026-06-28T10:02:00Z");
   const result = store.getState().importPairingPackage(JSON.stringify({
     version: 1,
-    app: "mobile-consolidation",
+    app: "sentinel-nexus",
     createdAt: "2026-06-28T10:01:00Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiKey: "mobile-secret",
@@ -304,7 +304,7 @@ test("setup automation store records deep link import format evidence", () => {
   const store = createSetupAutomationStore(() => "2026-06-28T10:02:00Z");
   const deepLink = buildRemotePairingDeepLink({
     version: 1,
-    app: "mobile-consolidation",
+    app: "sentinel-nexus",
     createdAt: "2026-06-28T10:01:00Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiKey: "mobile-secret",

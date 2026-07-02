@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-APK-Alerts stores the Discord bot token in app-managed secure settings for this private install workflow.
+Sentinel Nexus stores the Discord bot token in app-managed secure settings for this private install workflow.
 
 ## Context
 

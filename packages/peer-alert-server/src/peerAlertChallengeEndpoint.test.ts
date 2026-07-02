@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createEvent, type AlertPeerChallengeEvent } from "@apk-alerts/contracts";
+import { createEvent, type AlertPeerChallengeEvent } from "@sentinel-nexus/contracts";
 import {
   handlePeerAlertChallengeFetchRequest,
   handlePeerAlertChallengeRequest,

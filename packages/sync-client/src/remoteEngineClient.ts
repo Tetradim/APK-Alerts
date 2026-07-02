@@ -3,7 +3,7 @@ import {
   normalizeRemoteHealthPayload,
   normalizeRemoteStatusPayload,
   type RemoteEngineHealthSnapshot,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildRemoteEndpointClient,
   fetchRemoteJson,

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const nativeRoot = new URL(
-  "../../android/app/src/main/java/com/tetradim/apkalerts/phoneengine/",
+  "../../android/app/src/main/java/com/tetradim/sentinelnexus/phoneengine/",
   import.meta.url,
 );
 

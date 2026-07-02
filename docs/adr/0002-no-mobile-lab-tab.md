@@ -10,7 +10,7 @@ The Android app does not include the desktop Lab, replay, or backtest workflow a
 
 ## Context
 
-Mobile Consolidation is an operator and evidence app. Historical replay acceptance remains important, but the phone UI should focus on live evidence, engine status, alert audit trail, reconciliation, and arming gates.
+Sentinel Nexus is an operator and evidence app. Historical replay acceptance remains important, but the phone UI should focus on live evidence, engine status, alert audit trail, reconciliation, and arming gates.
 
 ## Consequences
 

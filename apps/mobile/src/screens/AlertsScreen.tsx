@@ -74,7 +74,7 @@ export function AlertsScreen() {
   const peerAlert = buildPeerAlertOutcomeSummary(peerAlertSnapshot);
 
   return (
-    <ScreenFrame title="Alerts" eyebrow="APK-Alerts">
+    <ScreenFrame title="Alerts" eyebrow="Sentinel Nexus">
       <View style={styles.headerRow}>
         <View style={styles.headerCopy}>
           <Text style={styles.label}>Remote evidence</Text>
@@ -145,7 +145,7 @@ export function AlertsScreen() {
           <Text style={styles.panelTitle}>No alert evidence</Text>
           <Text style={styles.detail}>
             Pair a Remote Engine and refresh to show Chrome bridge observations, parser confidence,
-            source-policy proof, audit decisions, and execution state from Consolidation.
+            source-policy proof, audit decisions, and execution state from Sentinel Echo.
           </Text>
         </View>
       ) : (

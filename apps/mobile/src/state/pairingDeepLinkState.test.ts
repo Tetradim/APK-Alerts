@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildRemotePairingDeepLink } from "@apk-alerts/contracts";
+import { buildRemotePairingDeepLink } from "@sentinel-nexus/contracts";
 import { createRemoteEngineStore } from "./remoteEngineState.js";
 import {
   createSetupAutomationStore,
@@ -13,7 +13,7 @@ test("pairing deep link handler imports pair URL and updates remote connection",
   const remoteStore = createRemoteEngineStore();
   const deepLink = buildRemotePairingDeepLink({
     version: 1,
-    app: "mobile-consolidation",
+    app: "sentinel-nexus",
     createdAt: "2026-06-28T10:01:00Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiKey: "mobile-secret",
@@ -57,7 +57,7 @@ test("pairing deep link handler reports malformed pairing links without exposing
   const setupStore = createSetupAutomationStore(() => "2026-06-28T10:02:00Z");
   const remoteStore = createRemoteEngineStore();
 
-  const result = applyPairingDeepLink("apkalerts://pair?payload=not-json", {
+  const result = applyPairingDeepLink("sentinelnexus://pair?payload=not-json", {
     importPairingPackage: setupStore.getState().importPairingPackage,
     updateConnectionDraft: remoteStore.getState().updateConnectionDraft,
   });

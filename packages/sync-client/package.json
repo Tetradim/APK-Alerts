@@ -1,5 +1,5 @@
 {
-  "name": "@apk-alerts/sync-client",
+  "name": "@sentinel-nexus/sync-client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,6 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@apk-alerts/contracts": "0.1.0"
+    "@sentinel-nexus/contracts": "0.1.0"
   }
 }

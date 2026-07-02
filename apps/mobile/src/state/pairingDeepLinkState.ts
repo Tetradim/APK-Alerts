@@ -1,7 +1,7 @@
 import {
   parseRemotePairingPackageInput,
   type RemotePairingPackageInputFormat,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import type { RemoteConnectionDraft } from "./remoteEngineState";
 import type { MobilePairingPackageImportResult } from "./setupAutomationState";
 

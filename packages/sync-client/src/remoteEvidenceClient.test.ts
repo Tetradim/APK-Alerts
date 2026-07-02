@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CHROME_DISCORD_MESSAGE_CONTRACT_VERSION } from "@apk-alerts/contracts";
+import { CHROME_DISCORD_MESSAGE_CONTRACT_VERSION } from "@sentinel-nexus/contracts";
 import {
   fetchRemoteAlertEvidence,
   normalizeRemoteEvidenceBaseUrl,
@@ -67,7 +67,7 @@ const auditEvent = {
     event_id: "chrome-message-1",
     channel: { id: "chrome-alerts", name: "chrome-alerts" },
     author: { id: "mike", name: "MikeInvesting" },
-    bridge_target: { id: "consolidation", name: "Consolidation" },
+    bridge_target: { id: "sentinel-echo", name: "Sentinel Echo" },
     raw_text: "BTO SPY 500C 6/21 @ 1.25",
     parser: { confidence: "high" },
     source: {

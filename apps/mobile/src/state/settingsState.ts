@@ -10,7 +10,7 @@ import {
   buildTransportLabel,
   normalizeDiscordIngestionSettings,
   normalizeFailoverSettings,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import { create } from "zustand";
 import {
   loadDiscordIngestionSettings,

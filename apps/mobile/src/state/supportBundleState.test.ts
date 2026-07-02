@@ -7,7 +7,7 @@ import {
   normalizeBridgeAlertDecisionEvent,
   normalizeLiveReadinessPayload,
   normalizeReconciliationPayload,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildSetupHealthReportSummary,
   buildMobileSupportBundle,
@@ -61,7 +61,7 @@ test("setup health report summarizes clear setup evidence for support bundle", (
   };
   Object.assign(input.windowsSetup, {
     installerRanAt: "2026-06-28T10:00:00Z",
-    consolidationRepoReady: true,
+    sentinelEchoRepoReady: true,
     tailscaleInstalled: true,
     tailscaleLoggedIn: true,
     tailscaleIp: "100.90.10.11",
@@ -76,7 +76,7 @@ test("setup health report summarizes clear setup evidence for support bundle", (
     checkedAt: "2026-06-28T10:01:30Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiPort: 8003,
-    firewallRuleName: "Mobile Consolidation API 8003",
+    firewallRuleName: "Sentinel Nexus API 8003",
     firewallRulePresent: true,
     localHealthOk: true,
     phoneReachabilityOk: true,
@@ -228,7 +228,7 @@ test("mobile support bundle includes setup assistant evidence without exposing i
   const windowsSetup = getDefaultWindowsSetupEvidence();
   Object.assign(windowsSetup, {
     installerRanAt: "2026-06-28T10:00:00Z",
-    consolidationRepoReady: true,
+    sentinelEchoRepoReady: true,
     tailscaleInstalled: true,
     tailscaleLoggedIn: true,
     tailscaleIp: "100.90.10.11",

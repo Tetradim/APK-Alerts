@@ -4,7 +4,7 @@ import {
   buildRemoteEngineHealthSnapshot,
   normalizeRemoteHealthPayload,
   normalizeRemoteStatusPayload,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildRemoteEngineSummary,
   classifyRemoteTransport,

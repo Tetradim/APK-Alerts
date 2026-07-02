@@ -3,7 +3,7 @@ import {
   type EngineHealthStatus,
   type LeaseEvidenceSnapshot,
   type LeaseEvidenceSnapshotInput,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import type { AlertEvidenceSnapshot } from "./alertEvidenceState";
 import type { LiveReadinessSnapshot } from "./liveReadinessState";
 import type { ActiveEngine, LeaseState, OperatorSnapshot, ReadinessState, SyncStatus } from "./operatorState";

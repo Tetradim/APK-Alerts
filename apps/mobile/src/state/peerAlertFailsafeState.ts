@@ -4,7 +4,7 @@ import type {
   AlertPeerChallengeEvent,
   AlertPeerFailsafeEvaluation,
   AlertPeerResponseEvent,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 
 export interface PeerAlertChallengeOutcome {
   ok: boolean;

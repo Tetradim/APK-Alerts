@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeReconciliationPayload, summarizeReconciliationRows } from "@apk-alerts/contracts";
+import { normalizeReconciliationPayload, summarizeReconciliationRows } from "@sentinel-nexus/contracts";
 import {
   buildReconciliationAuditDigest,
   buildOrderLifecycleEvidenceSummary,

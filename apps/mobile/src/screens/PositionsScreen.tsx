@@ -42,7 +42,7 @@ export function PositionsScreen() {
     : "Never checked";
 
   return (
-    <ScreenFrame title="Positions" eyebrow="APK-Alerts">
+    <ScreenFrame title="Positions" eyebrow="Sentinel Nexus">
       <View style={styles.headerRow}>
         <View style={styles.headerCopy}>
           <Text style={styles.label}>Reconciliation</Text>
@@ -118,7 +118,7 @@ export function PositionsScreen() {
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>No reconciliation rows</Text>
           <Text style={styles.detail}>
-            Pair a Remote Engine and check reconciliation to show alert, trade, order, and position links from Consolidation.
+            Pair a Remote Engine and check reconciliation to show alert, trade, order, and position links from Sentinel Echo.
           </Text>
         </View>
       ) : (

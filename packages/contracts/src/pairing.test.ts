@@ -46,7 +46,7 @@ test("remote pairing status normalization maps snake case without carrying secre
 test("remote pairing config normalization keeps the explicit import key", () => {
   const config = normalizeRemotePairingConfigPayload({
     version: 1,
-    app: "mobile-consolidation",
+    app: "sentinel-nexus",
     created_at: "2026-06-27T18:01:00Z",
     remote_api_url: "http://100.90.10.11:8003/api",
     api_key: "mobile-secret-value",
@@ -78,10 +78,10 @@ test("remote pairing normalization rejects fractional numeric fields", () => {
   assert.equal(config.version, 0);
 });
 
-test("remote pairing package input parses JSON and apkalerts deep links", () => {
+test("remote pairing package input parses JSON and sentinel nexus deep links", () => {
   const config = {
     version: 1,
-    app: "mobile-consolidation",
+    app: "sentinel-nexus",
     createdAt: "2026-06-28T12:10:00Z",
     remoteApiUrl: "http://100.90.10.11:8003/api",
     apiKey: "mobile-secret-value",
@@ -99,12 +99,12 @@ test("remote pairing package input parses JSON and apkalerts deep links", () => 
   assert.equal(fromDeepLink.ok, true);
   assert.equal(fromDeepLink.format, "deep_link");
   assert.equal(fromDeepLink.config.apiKey, "mobile-secret-value");
-  assert.match(deepLink, /^apkalerts:\/\/pair\?payload=/);
+  assert.match(deepLink, /^sentinelnexus:\/\/pair\?payload=/);
   assert.doesNotMatch(deepLink, /mobile-secret-value|\{|"apiKey"/);
 });
 
 test("remote pairing package input fails closed for malformed deep links without echoing payloads", () => {
-  const result = parseRemotePairingPackageInput("apkalerts://pair?payload=not-json");
+  const result = parseRemotePairingPackageInput("sentinelnexus://pair?payload=not-json");
 
   assert.equal(result.ok, false);
   assert.equal(result.format, "deep_link");

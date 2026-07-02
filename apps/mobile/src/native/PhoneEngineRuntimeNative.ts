@@ -6,7 +6,7 @@ import {
   stopNativePhoneEngineRuntime as stopRuntime,
   type PhoneEngineRuntimeNativeModule,
 } from "./phoneEngineRuntimeBridge";
-import type { DiscordIngestionSettings } from "@apk-alerts/contracts";
+import type { DiscordIngestionSettings } from "@sentinel-nexus/contracts";
 
 function getPhoneEngineRuntimeNativeModule(): PhoneEngineRuntimeNativeModule | null {
   if (Platform.OS !== "android") {

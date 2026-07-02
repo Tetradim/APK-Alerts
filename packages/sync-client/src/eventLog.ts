@@ -1,4 +1,4 @@
-import type { AnyTradingEvent } from "@apk-alerts/contracts";
+import type { AnyTradingEvent } from "@sentinel-nexus/contracts";
 
 function deepClone<T>(value: T): T {
   return structuredClone(value);

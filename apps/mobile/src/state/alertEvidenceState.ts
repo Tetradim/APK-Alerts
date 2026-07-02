@@ -4,13 +4,13 @@ import {
   normalizeLeaseEvidenceSnapshot,
   type AlertEvidenceChain,
   type ReconciliationRow,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   fetchRemoteAlertEvidence,
   type RemoteAlertEvidenceResult,
   type RemoteAlertEvidenceSnapshot,
   type RemoteEvidenceClientConfig,
-} from "@apk-alerts/sync-client";
+} from "@sentinel-nexus/sync-client";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 import { classifyRemoteTransport, type RemoteTransport } from "./remoteEngineState";

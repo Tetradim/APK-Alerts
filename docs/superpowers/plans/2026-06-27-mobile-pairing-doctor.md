@@ -2,11 +2,11 @@
 
 ## Goal
 
-Make Mobile Consolidation prove, from inside the Android app, whether it is paired to the remote Consolidation engine and whether the required remote endpoints are reachable with the configured API key. This becomes the base evidence for later install readiness, support bundle export, and alert timeline views.
+Make Sentinel Nexus prove, from inside the Android app, whether it is paired to the remote Sentinel Echo engine and whether the required remote endpoints are reachable with the configured API key. This becomes the base evidence for later install readiness, support bundle export, and alert timeline views.
 
 ## Batch 1 - Remote Pairing Contract
 
-1. Add a Consolidation backend pairing route under `/api/pairing/status`.
+1. Add a Sentinel Echo backend pairing route under `/api/pairing/status`.
 2. Keep `/api/pairing/status` non-secret: it may report whether an API key is configured, whether remote binding is enabled, and which checks are expected, but it must not return the API key.
 3. Add `/api/pairing/config` for keyed/local pairing payloads. This route may include the API key only when the backend is running authless local desktop mode or the request already supplied the valid API key.
 4. Include endpoint checks for health, status, setup diagnostics, live readiness, alert evidence, reconciliation, bot bus, and Chrome bridge.
@@ -29,4 +29,4 @@ Make Mobile Consolidation prove, from inside the Android app, whether it is pair
 
 ## Verification
 
-Run backend tests for the pairing route, then APK-Alerts typecheck, lint, and tests. Build the release APK only after both repositories pass their targeted checks.
+Run backend tests for the pairing route, then Sentinel Nexus typecheck, lint, and tests. Build the release APK only after both repositories pass their targeted checks.

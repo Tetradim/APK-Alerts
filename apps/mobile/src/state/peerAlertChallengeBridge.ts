@@ -1,4 +1,4 @@
-import type { EngineId } from "@apk-alerts/contracts";
+import type { EngineId } from "@sentinel-nexus/contracts";
 import {
   handlePeerAlertChallengeRequest,
   type PeerAlertChallengeEndpointConfig,
@@ -6,7 +6,7 @@ import {
   type PeerAlertChallengeEndpointRequest,
   type PeerAlertChallengeEndpointResponse,
   type PeerAlertPhoneAlertSnapshot,
-} from "@apk-alerts/peer-alert-server";
+} from "@sentinel-nexus/peer-alert-server";
 import {
   peerAlertFailsafeStore,
   type PeerAlertFailsafeState,

@@ -65,7 +65,7 @@ export function CockpitScreen() {
   });
 
   return (
-    <ScreenFrame title="Operator Cockpit" eyebrow="APK-Alerts">
+    <ScreenFrame title="Operator Cockpit" eyebrow="Sentinel Nexus">
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.label}>Active engine</Text>

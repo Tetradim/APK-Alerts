@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createEvent } from "@apk-alerts/contracts";
-import { PEER_ALERT_CHALLENGE_PATH } from "@apk-alerts/peer-alert-server";
+import { createEvent } from "@sentinel-nexus/contracts";
+import { PEER_ALERT_CHALLENGE_PATH } from "@sentinel-nexus/peer-alert-server";
 import { createMobilePeerAlertChallengeHandler } from "./peerAlertChallengeBridge.js";
 import {
   buildPeerAlertOutcomeSummary,

@@ -1,4 +1,4 @@
-import type { DiscordIngestionSettings } from "@apk-alerts/contracts";
+import type { DiscordIngestionSettings } from "@sentinel-nexus/contracts";
 import type { StoreApi } from "zustand/vanilla";
 import {
   configureNativeDiscordIngestion,

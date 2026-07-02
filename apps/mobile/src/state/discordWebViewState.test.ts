@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_DISCORD_INGESTION_SETTINGS } from "@apk-alerts/contracts";
+import { DEFAULT_DISCORD_INGESTION_SETTINGS } from "@sentinel-nexus/contracts";
 import {
   buildDiscordWebViewHealthSummary,
   buildDiscordWebViewUiState,

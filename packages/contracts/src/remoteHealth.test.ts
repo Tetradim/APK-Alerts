@@ -6,7 +6,7 @@ import {
   normalizeRemoteStatusPayload,
 } from "./index.js";
 
-test("remote health normalizes healthy Consolidation payload", () => {
+test("remote health normalizes healthy Sentinel Echo payload", () => {
   const health = normalizeRemoteHealthPayload({
     status: "healthy",
     discord_connected: true,

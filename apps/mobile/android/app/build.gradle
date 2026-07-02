@@ -80,10 +80,10 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
-def releaseStoreFilePath = findProperty('APK_ALERTS_RELEASE_STORE_FILE') ?: System.getenv('APK_ALERTS_RELEASE_STORE_FILE')
-def releaseStorePassword = findProperty('APK_ALERTS_RELEASE_STORE_PASSWORD') ?: System.getenv('APK_ALERTS_RELEASE_STORE_PASSWORD')
-def releaseKeyAlias = findProperty('APK_ALERTS_RELEASE_KEY_ALIAS') ?: System.getenv('APK_ALERTS_RELEASE_KEY_ALIAS')
-def releaseKeyPassword = findProperty('APK_ALERTS_RELEASE_KEY_PASSWORD') ?: System.getenv('APK_ALERTS_RELEASE_KEY_PASSWORD')
+def releaseStoreFilePath = findProperty('SENTINEL_NEXUS_RELEASE_STORE_FILE') ?: System.getenv('SENTINEL_NEXUS_RELEASE_STORE_FILE')
+def releaseStorePassword = findProperty('SENTINEL_NEXUS_RELEASE_STORE_PASSWORD') ?: System.getenv('SENTINEL_NEXUS_RELEASE_STORE_PASSWORD')
+def releaseKeyAlias = findProperty('SENTINEL_NEXUS_RELEASE_KEY_ALIAS') ?: System.getenv('SENTINEL_NEXUS_RELEASE_KEY_ALIAS')
+def releaseKeyPassword = findProperty('SENTINEL_NEXUS_RELEASE_KEY_PASSWORD') ?: System.getenv('SENTINEL_NEXUS_RELEASE_KEY_PASSWORD')
 def hasReleaseSigning = releaseStoreFilePath && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
 
 android {
@@ -92,9 +92,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.tetradim.apkalerts'
+    namespace 'com.tetradim.sentinelnexus'
     defaultConfig {
-        applicationId 'com.tetradim.apkalerts'
+        applicationId 'com.tetradim.sentinelnexus'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

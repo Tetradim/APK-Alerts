@@ -1,7 +1,7 @@
 import {
   normalizeDiscordIngestionSettings,
   type DiscordIngestionSettings,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   getDefaultPhoneEngineRuntimeSnapshot,
   type PhoneEngineRuntimeHealth,

@@ -3,7 +3,7 @@ import {
   summarizeReconciliationRows,
   type ReconciliationRow,
   type ReconciliationSummary,
-} from "@apk-alerts/contracts";
+} from "@sentinel-nexus/contracts";
 import {
   buildRemoteEndpointClient,
   fetchRemoteJson,
